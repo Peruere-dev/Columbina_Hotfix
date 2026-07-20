@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="admin_page_title">管理后台</title>
+<style>
+:root {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --primary: #4f6ef7;
+  --primary-light: #eef1ff;
+  --primary-dark: #3b55d9;
+  --accent: #14b8a6;
+  --accent-light: #f0fdfa;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --success: #22c55e;
+  --success-bg: #f0fdf4;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --warning: #f59e0b;
+  --warning-bg: #fffbeb;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Login */
+.login-page {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eef1ff 0%, #f0fdfa 50%, #f1f5f9 100%);
+}
+.login-card {
+  background: var(--card); border-radius: 12px; padding: 40px;
+  box-shadow: var(--shadow-md); width: 380px; max-width: 90vw;
+}
+.login-card h1 {
+  text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 6px;
+  color: var(--primary-dark);
+}
+.login-card p {
+  text-align: center; color: var(--text-secondary); font-size: 14px; margin-bottom: 28px;
+}
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.form-group input {
+  width: 100%; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+  background: var(--card);
+}
+.form-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,110,247,0.12); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 20px; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: .9; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { opacity: .9; }
+.btn-warning { background: var(--warning); color: #fff; }
+.btn-warning:hover { opacity: .9; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border: 1.5px solid var(--border); }
+.btn-ghost:hover { background: var(--bg); }
+.btn-block { width: 100%; justify-content: center; }
+.error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+
+/* App layout */
+.app { display: none; }
+.app.active { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 240px; background: var(--card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  position: relative; z-index: 50;
+}
+.sidebar-header {
+  padding: 20px 20px 16px; font-size: 15px; font-weight: 700; color: var(--text);
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
+}
+.sidebar-header .logo { width: 24px; height: 24px; background: var(--primary); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700; }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.sidebar .nav-item {
+  display: flex; align-items: center; gap: 10px;
+  margin: 2px 8px; padding: 9px 12px; border-radius: var(--radius-sm);
+  font-size: 14px; color: var(--text-secondary); cursor: pointer;
+  transition: all .15s;
+}
+.sidebar .nav-item:hover { background: var(--primary-light); color: var(--primary); }
+.sidebar .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
+.sidebar-footer .logout-btn { cursor: pointer; color: var(--danger); display: flex; align-items: center; gap: 6px; padding: 6px 0; }
+.sidebar-footer .logout-btn:hover { text-decoration: underline; }
+
+/* Mobile sidebar */
+.mobile-toggle {
+  display: none; position: fixed; top: 10px; left: 10px; z-index: 60;
+  width: 36px; height: 36px; border: none; border-radius: var(--radius-sm);
+  background: var(--card); box-shadow: var(--shadow); cursor: pointer;
+  align-items: center; justify-content: center; font-size: 18px; color: var(--text);
+}
+.sidebar-backdrop { display: none; }
+
+/* Main content */
+.main {
+  flex: 1; padding: 24px 28px; overflow-x: auto; min-width: 0;
+}
+.main-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;
+}
+.main-header h1 { font-size: 20px; font-weight: 700; }
+.header-right { display: flex; align-items: center; gap: 14px; font-size: 14px; color: var(--text-secondary); }
+.header-right .username { font-weight: 600; color: var(--text); }
+
+/* Stats */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card); border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.stat-card .value { font-size: 26px; font-weight: 700; color: var(--primary); }
+.stat-card .label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+/* Table */
+.table-wrap {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.table-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
+}
+.table-toolbar .search-box {
+  padding: 6px 11px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; outline: none; width: 200px; background: var(--card);
+  transition: border-color .2s, box-shadow .2s;
+}
+.table-toolbar .search-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,110,247,0.1); }
+table { width: 100%; border-collapse: collapse; min-width: 400px; }
+th, td { padding: 8px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { background: #f8fafc; font-weight: 600; color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f8faff; }
+
+/* Sticky first column */
+th:first-child, td:first-child {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--card);
+}
+th:first-child { background: #f8fafc; z-index: 3; }
+tr:hover td:first-child { background: #f8faff; }
+th:first-child::after, td:first-child::after {
+  content: ''; position: absolute; right: -8px; top: 0; bottom: 0;
+  width: 8px; pointer-events: none;
+  background: linear-gradient(to right, rgba(0,0,0,0.06), transparent);
+}
+.row-banned td:first-child { background: #fef2f2 !important; }
+tr.row-banned:hover td:first-child { background: #fef2f2 !important; }
+
+td .actions { display: flex; gap: 4px; flex-wrap: nowrap; }
+td .actions .act-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px; border: none; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s;
+  white-space: nowrap;
+}
+td .actions .act-btn:hover { opacity: .85; transform: translateY(-1px); }
+td .actions .act-btn:active { transform: translateY(0); }
+.act-primary { background: #eef1ff; color: #4f6ef7; }
+.act-green { background: #f0fdf4; color: #15803d; }
+.act-red { background: #fef2f2; color: #dc2626; }
+.act-orange { background: #fffbeb; color: #b45309; }
+.act-cyan { background: #f0fdfa; color: #0f766e; }
+.act-gray { background: #f1f5f9; color: #475569; }
+
+.badge {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.badge-ok { background: #dcfce7; color: #15803d; }
+.badge-warn { background: #fef3c7; color: #b45309; }
+.badge-expired { background: #fee2e2; color: #dc2626; }
+.badge-ban { background: #f3e8ff; color: #7c3aed; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.4);
+  align-items: center; justify-content: center; z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--card); border-radius: var(--radius); padding: 24px;
+  width: 440px; max-width: 92vw; max-height: 85vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg); animation: modalIn .2s ease;
+}
+@keyframes modalIn {
+  from { opacity:0; transform:scale(.96) translateY(8px); }
+  to { opacity:1; transform:scale(1) translateY(0); }
+}
+.modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+.modal .form-group { margin-bottom: 14px; }
+.modal .form-group select {
+  width: 100%; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; outline: none; background: var(--card);
+}
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.modal-info { color: var(--text-secondary); font-size: 13px; margin-bottom: 14px; }
+.modal-date-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.modal-date-row select { flex: 1; min-width: 56px; padding: 9px 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; outline: none; background: var(--card); color: var(--text); }
+.modal-date-row .sep { color: var(--text-muted); font-size: 13px; }
+.modal-big-icon { font-size: 36px; margin-bottom: 8px; font-weight: bold; }
+.modal-icon { font-size: 24px; margin-bottom: 8px; font-weight: bold; }
+.confirm-text, .alert-text { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .mobile-toggle { display: flex; }
+  .sidebar {
+    position: fixed; top: 0; left: -260px; height: 100%; width: 260px;
+    transition: left .25s ease; box-shadow: var(--shadow-lg); z-index: 59;
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.35);
+    z-index: 58; opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .sidebar-backdrop.active { opacity: 1; pointer-events: auto; }
+  .main { padding: 12px; padding-top: 56px; }
+  .table-toolbar { flex-direction: column; align-items: stretch; }
+  .table-toolbar .search-box { width: 100%; }
+  table { font-size: 12px; min-width: 360px; }
+  th, td { padding: 6px 8px; }
+  td .actions { flex-wrap: wrap; gap: 3px; }
+  td .actions .act-btn { padding: 3px 7px; font-size: 11px; }
+  .modal { padding: 18px; width: 95vw; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  table { min-width: 340px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-page" id="loginPage">
+  <div class="login-card">
+    <h1 data-i18n="admin_login_title">管理后台</h1>
+    <p data-i18n="admin_login_subtitle">请登录以管理系统</p>
+    <div class="form-group">
+      <label data-i18n="admin_login_username_label">管理员账号</label>
+      <input type="text" id="loginUser" placeholder="输入管理员账号" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label data-i18n="admin_login_password_label">密码</label>
+      <input type="password" id="loginPass" placeholder="输入密码" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="adminLogin()" data-i18n="admin_login_btn">登 录</button>
+    <div class="error-msg" id="loginError"></div>
+    <div style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted)">
+      <span style="cursor:pointer;color:var(--primary)" onclick="switchLang(0)">中文</span> / <span style="cursor:pointer;color:var(--primary)" onclick="switchLang(1)">English</span>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile toggle -->
+<button class="mobile-toggle" id="mobileToggle" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+<!-- App -->
+<div class="app" id="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">G</span> <span data-i18n="admin_sidebar_name">管理后台</span>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <span data-i18n="admin_sidebar_dashboard">仪表盘</span>
+      </div>
+      <div class="nav-item" data-tab="users" onclick="switchTab('users')">
+        <span data-i18n="admin_sidebar_users">用户管理</span>
+      </div>
+      <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+        <span data-i18n="admin_sidebar_settings">设置</span>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div style="margin-bottom:8px;color:var(--text-secondary);font-size:13px" id="sidebarUser"></div>
+      <div style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">
+        <span style="cursor:pointer;color:var(--primary)" onclick="switchLang(0)">中文</span> / <span style="cursor:pointer;color:var(--primary)" onclick="switchLang(1)">English</span>
+      </div>
+      <div class="logout-btn" onclick="adminLogout()" data-i18n="admin_logout_btn">退出登录</div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="main-header">
+      <h1 id="pageTitle" data-i18n="admin_sidebar_dashboard">仪表盘</h1>
+      <div class="header-right">
+        <span class="username" id="headerUser" style="display:none"></span>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="tabDashboard" class="tab-content">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="table-wrap" style="margin-top:16px">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600" data-i18n="admin_dashboard_version_title">版本请求统计</div>
+        <table>
+          <thead><tr>
+            <th data-i18n="admin_dashboard_version">版本</th><th data-i18n="admin_dashboard_platform">平台</th><th data-i18n="admin_dashboard_requests">请求数</th><th data-i18n="admin_dashboard_last_request">最后请求</th>
+          </tr></thead>
+          <tbody id="versionStatsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div id="tabUsers" class="tab-content" style="display:none">
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <input class="search-box" data-i18n-placeholder="admin_users_search_placeholder" placeholder="搜索用户名..." oninput="filterUsers()" id="userSearch">
+          <button class="btn btn-primary btn-sm" onclick="showCreateUser()" data-i18n="admin_users_new_btn">+ 新用户</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th data-i18n="admin_users_user">用户</th><th data-i18n="admin_users_status">状态</th><th data-i18n="admin_users_actions">操作</th>
+          </tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="tabSettings" class="tab-content" style="display:none">
+      <div style="display:grid;gap:20px;max-width:500px">
+        <div class="table-wrap">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600" data-i18n="admin_settings_admin">管理员设置</div>
+          <div style="padding:16px">
+            <div class="form-group">
+              <label data-i18n="admin_settings_username">管理员用户名</label>
+              <input type="text" id="setUsername" placeholder="admin" maxlength="32">
+            </div>
+            <div class="form-group">
+              <label data-i18n="admin_settings_password">新密码（留空不修改）</label>
+              <input type="password" id="setPassword" placeholder="输入新密码" maxlength="32">
+            </div>
+            <div class="form-group">
+              <label data-i18n="admin_settings_route">管理面板路由</label>
+              <input type="text" id="setRoute" placeholder="/admin">
+            </div>
+            <div class="form-group">
+              <label data-i18n="admin_settings_old_password">原密码（修改需要验证）</label>
+              <input type="password" id="setOldPassword" placeholder="输入原密码">
+            </div>
+            <div class="modal-footer" style="border:none;padding:0;margin-top:6px">
+              <button class="btn btn-primary" onclick="saveSettings()" data-i18n="admin_settings_save">保存设置</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="createUserModal">
+  <div class="modal">
+    <h2 data-i18n="admin_modal_create_user_title">新建用户</h2>
+    <div class="form-group">
+      <label data-i18n="admin_modal_username_label">用户名 (4-32字符)</label>
+      <input type="text" id="newUserName" data-i18n-placeholder="admin_username_placeholder" placeholder="输入用户名" maxlength="32">
+    </div>
+    <div class="form-group">
+      <label data-i18n="admin_modal_password_label">密码 (4-32字符，留空自动生成)</label>
+      <input type="text" id="newUserPass" data-i18n-placeholder="admin_password_placeholder" placeholder="输入密码或留空" maxlength="32">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('createUserModal')" data-i18n="admin_modal_cancel">取消</button>
+      <button class="btn btn-primary" onclick="createUser()" data-i18n="admin_modal_create">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Detail Modal -->
+<div class="modal-overlay" id="userDetailModal">
+  <div class="modal">
+    <h2 data-i18n="admin_modal_user_detail_title">用户详情</h2>
+    <div id="userDetailContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('userDetailModal')" data-i18n="admin_modal_close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ban Modal -->
+<div class="modal-overlay" id="banModal">
+  <div class="modal">
+    <h2 data-i18n="admin_modal_ban_title">封禁用户</h2>
+    <div id="banUserInfo" class="modal-info"></div>
+    <div class="form-group">
+      <label data-i18n="admin_modal_ban_reason_label">封禁原因</label>
+      <input type="text" id="banReason" data-i18n-placeholder="admin_modal_ban_reason_placeholder" placeholder="可选" maxlength="200">
+    </div>
+    <div class="form-group">
+      <label data-i18n="admin_modal_ban_mode_label">封禁模式</label>
+      <select id="banMode" onchange="toggleBanExpiry()">
+        <option value="permanent" data-i18n="admin_modal_ban_permanent">永久封禁</option>
+        <option value="timed" data-i18n="admin_modal_ban_timed">限时封禁</option>
+      </select>
+    </div>
+    <div class="form-group" id="banExpiryGroup" style="display:none">
+      <label data-i18n="admin_modal_ban_expiry_label">解封时间</label>
+      <div class="modal-date-row">
+        <select id="banYear"></select>
+        <span class="sep">年</span>
+        <select id="banMonth"></select>
+        <span class="sep">月</span>
+        <select id="banDay"></select>
+        <span class="sep">日</span>
+        <select id="banHour"></select>
+        <span class="sep">:</span>
+        <select id="banMinute"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('banModal')" data-i18n="admin_modal_cancel">取消</button>
+      <button class="btn btn-primary" onclick="confirmBan()" data-i18n="admin_modal_ban_confirm">封禁</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="text-align:center">
+    <div id="confirmIcon" class="modal-big-icon">!</div>
+    <h2 id="confirmTitle" data-i18n="admin_modal_confirm_title">确认</h2>
+    <p id="confirmText" class="confirm-text"></p>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-ghost" id="confirmCancel" onclick="closeConfirm()" data-i18n="admin_modal_cancel">取消</button>
+      <button class="btn btn-primary" id="confirmOk" onclick="confirmAction()" data-i18n="admin_modal_confirm_ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Modal -->
+<div class="modal-overlay" id="alertModal">
+  <div class="modal" style="text-align:center">
+    <div id="alertIcon" class="modal-icon">i</div>
+    <h2 id="alertTitle" data-i18n="admin_success">提示</h2>
+    <p id="alertText" class="alert-text"></p>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-primary" onclick="closeAlert()" data-i18n="admin_modal_alert_ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename Modal -->
+<div class="modal-overlay" id="renameModal">
+  <div class="modal">
+    <h2 data-i18n="admin_modal_rename_title">修改用户名</h2>
+    <div id="renameUserInfo" class="modal-info"></div>
+    <div class="form-group">
+      <label data-i18n="admin_modal_rename_new_label">新用户名（4-32字符）</label>
+      <input type="text" id="renameInput" placeholder="输入新用户名" maxlength="32">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('renameModal')" data-i18n="admin_modal_cancel">取消</button>
+      <button class="btn btn-primary" onclick="confirmRename()" data-i18n="admin_modal_rename_confirm">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- UID Modal -->
+<div class="modal-overlay" id="uidModal">
+  <div class="modal">
+    <h2 data-i18n="admin_modal_uid_title">修改 UID</h2>
+    <div id="uidUserInfo" class="modal-info"></div>
+    <div class="form-group">
+      <label data-i18n="admin_modal_uid_new_label">新 UID</label>
+      <input type="text" id="uidInput" placeholder="输入新 UID" maxlength="16">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('uidModal')" data-i18n="admin_modal_cancel">取消</button>
+      <button class="btn btn-primary" onclick="confirmUid()" data-i18n="admin_modal_uid_confirm">确认修改</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const _L = /*LANG_DATA*/;
+function t(k) { return _L[k] || k; }
+function translatePage() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  var tk = document.querySelector('title[data-i18n]');
+  if (tk) document.title = t(tk.getAttribute('data-i18n'));
+}
+const API = (function() {
+  const path = window.location.pathname;
+  const idx = path.indexOf("/api");
+  return (idx >= 0 ? path.substring(0, idx) : path.replace(/\/+$/, "")) + "/api";
+})();
+let currentTab = "dashboard";
+let usersData = [];
+
+// Auth
+function getToken() { return localStorage.getItem("admin_token"); }
+
+async function api(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["Authorization"] = token;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const res = await r.json();
+  if (res.error && !("ok" in res) && path !== "/login" && path !== "/logout") {
+    localStorage.removeItem("admin_token");
+    document.getElementById("app").classList.remove("active");
+    document.getElementById("loginPage").style.display = "flex";
+    throw new Error(res.error);
+  }
+  return res;
+}
+
+async function adminLogin() {
+  const u = document.getElementById("loginUser").value;
+  const p = document.getElementById("loginPass").value;
+  const err = document.getElementById("loginError");
+  err.style.display = "none";
+  if (!u || !p) { err.textContent = t('admin_login_error_empty'); err.style.display = "block"; return; }
+  const res = await api("POST", "/login", { username: u, password: p });
+  if (res.token) {
+    localStorage.setItem("admin_token", res.token);
+    enterApp();
+  } else {
+    err.textContent = res.message || t('admin_login_fail');
+    err.style.display = "block";
+  }
+}
+
+function adminLogout() {
+  api("POST", "/logout");
+  localStorage.removeItem("admin_token");
+  document.getElementById("app").classList.remove("active");
+  document.getElementById("loginPage").style.display = "flex";
+}
+
+async function switchLang(lang) {
+  await fetch("/api/lang", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang }) });
+  location.reload();
+}
+
+async function enterApp() {
+  const me = await api("GET", "/me");
+  if (!me.username) { adminLogout(); return; }
+  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("app").classList.add("active");
+  document.getElementById("headerUser").textContent = me.username;
+  document.getElementById("sidebarUser").textContent = t('admin_sidebar_current_user_prefix') + me.username;
+  switchTab("dashboard");
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  toggleSidebar();
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.tab === tab));
+  document.querySelectorAll(".tab-content").forEach(t => t.style.display = "none");
+  document.getElementById("tab" + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = "block";
+  const titles = { dashboard: t('admin_sidebar_dashboard'), users: t('admin_sidebar_users'), settings: t('admin_sidebar_settings') };
+  document.getElementById("pageTitle").textContent = titles[tab];
+  if (tab === "dashboard") loadStats();
+  if (tab === "users") loadUsers();
+  if (tab === "settings") loadSettings();
+}
+
+async function loadSettings() {
+  const me = await api("GET", "/me");
+  if (!me.username) return;
+  document.getElementById("setUsername").value = me.username;
+}
+
+async function saveSettings() {
+  const body = { old_password: document.getElementById("setOldPassword").value };
+  const newU = document.getElementById("setUsername").value.trim();
+  const newP = document.getElementById("setPassword").value;
+  const newR = document.getElementById("setRoute").value.trim();
+  if (!body.old_password) { showAlert(t('admin_error'), t('admin_settings_old_password_required')); return; }
+  if (newU) body.new_username = newU;
+  if (newP) body.new_password = newP;
+  if (newR) body.new_route = newR;
+  if (Object.keys(body).length < 2) { showAlert(t('admin_error'), t('admin_settings_nothing')); return; }
+  const res = await api("POST", "/settings", body);
+  if (res.ok) {
+    showAlert(t('admin_success'), t('admin_settings_saved') + (res.username ? ' (' + res.username + ')' : ''));
+    if (res.logout) { setTimeout(adminLogout, 1500); }
+  } else {
+    showAlert(t('admin_error'), res.error || '');
+  }
+}
+
+// Stats
+async function loadStats() {
+  const res = await api("GET", "/stats");
+  const d = res.data || {};
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-card"><div class="value">${d.total_users || 0}</div><div class="label">${t('admin_dashboard_total_users')}</div></div>
+    <div class="stat-card"><div class="value">${d.active_users || 0}</div><div class="label">${t('admin_dashboard_active_users')}</div></div>
+    <div class="stat-card"><div class="value">${d.banned_users || 0}</div><div class="label">${t('admin_dashboard_banned_users')}</div></div>
+    <div class="stat-card"><div class="value">${d.total_requests || 0}</div><div class="label">${t('admin_dashboard_total_requests')}</div></div>
+  `;
+  const vs = res.version_stats || [];
+  const html = vs.length === 0
+    ? '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px">' + t('admin_dashboard_no_data') + '</td></tr>'
+    : vs.map(s => `<tr>
+      <td><code>${s.version || '(空)'}</code></td>
+      <td>${s.platform || '-'}</td>
+      <td>${s.request_count}</td>
+      <td>${s.last_request || '-'}</td>
+    </tr>`).join("");
+  document.getElementById("versionStatsBody").innerHTML = html;
+}
+
+// Users
+async function loadUsers() {
+  const res = await api("GET", "/users");
+  usersData = (res.data && Array.isArray(res.data)) ? res.data : [];
+  renderUsers();
+}
+
+function renderUsers() {
+  const q = (document.getElementById("userSearch").value || "").toLowerCase();
+  const rows = usersData.filter(u => u.username.toLowerCase().includes(q)).map(u => {
+    const banned = u.banned == 1 || u.banned == "1";
+    const statusHtml = banned
+      ? '<span class="badge badge-ban">' + t('admin_users_banned') + '</span>'
+      : '<span class="badge badge-ok">' + t('admin_users_normal') + '</span>';
+    return `<tr class="${banned ? 'row-banned' : ''}">
+      <td><div style="font-weight:600;font-size:13px">${u.username}</div><small style="color:var(--text-secondary);font-size:11px">UID ${u.uid}</small></td>
+      <td>${statusHtml}</td>
+      <td>
+        <div class="actions">
+          <button class="act-btn act-primary" onclick="showUserDetail('${u.username}')">${t('admin_action_detail')}</button>
+          ${banned
+            ? `<button class="act-btn act-green" onclick="unbanUser('${u.username}')">${t('admin_action_unban')}</button>`
+            : `<button class="act-btn act-red" onclick="showBan('${u.username}')">${t('admin_action_ban')}</button>`
+          }
+          <button class="act-btn act-cyan" onclick="showRename('${u.username}')">${t('admin_action_rename')}</button>
+          <button class="act-btn act-orange" onclick="showUid('${u.username}')">${t('admin_action_uid')}</button>
+          <button class="act-btn act-red" onclick="deleteUser('${u.username}')">${t('admin_action_delete')}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  document.getElementById("usersBody").innerHTML = rows || "<tr><td colspan=3 style='text-align:center;color:var(--text-secondary);padding:30px'>" + t('admin_users_empty') + "</td></tr>";
+}
+
+function filterUsers() { renderUsers(); }
+
+async function deleteUser(username) {
+  showConfirm(t('admin_modal_confirm_title'), t('admin_confirm_delete_user') + username + t('admin_confirm_irreversible'), null, async function() {
+    const res = await api("POST", "/users/" + encodeURIComponent(username), { action: "delete" });
+    if (!res.error) { loadUsers(); }
+    else { showAlert(t('admin_error'), res.error || t('admin_delete_fail')); }
+  });
+}
+
+function showCreateUser() {
+  document.getElementById("newUserName").value = "";
+  document.getElementById("newUserPass").value = "";
+  document.getElementById("createUserModal").classList.add("active");
+}
+
+async function createUser() {
+  const u = document.getElementById("newUserName").value;
+  const p = document.getElementById("newUserPass").value;
+  if (u.length < 4 || u.length > 32) { showAlert(t('admin_error'), t('admin_username_required')); return; }
+  if (p && (p.length < 4 || p.length > 32)) { showAlert(t('admin_error'), t('admin_password_required')); return; }
+  const res = await api("POST", "/users", { username: u, password: p || undefined });
+  if (!res.error) { closeModal("createUserModal"); loadUsers(); }
+  else { showAlert(t('admin_error'), res.error || t('admin_create_fail')); }
+}
+
+function showUserDetail(username) {
+  const u = usersData.find(x => x.username === username);
+  if (!u) return;
+  const html = `
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <div><div style="background:var(--primary-light);color:var(--primary);width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">${u.username[0].toUpperCase()}</div></div>
+      <div><div style="font-weight:600;font-size:15px">${u.username}</div><small style="color:var(--text-secondary)">UID ${u.uid}</small></div>
+    </div>
+    <div class="form-group">
+      <label>${t('admin_modal_change_password_title')}</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <input type="text" id="newPwInput" placeholder="${t('admin_modal_new_password_placeholder')}" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px">
+        <button class="btn btn-primary btn-sm" onclick="changePw('${u.username}')">${t('admin_action_modify')}</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>重置 Token</label>
+      <div style="margin-top:4px">
+        <button class="btn btn-warning btn-sm" onclick="resetToken('${u.username}')">重置会话 Token</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("userDetailContent").innerHTML = html;
+  document.getElementById("userDetailModal").classList.add("active");
+}
+
+async function resetToken(username) {
+  if (!confirm('确定重置 ' + username + ' 的 Token？此操作将使该用户下线。')) return;
+  const res = await api("POST", "/users/" + encodeURIComponent(username) + "/reset-token");
+  if (!res.error) { showAlert(t('admin_success'), 'Token 已重置'); }
+  else { showAlert(t('admin_error'), res.error); }
+}
+
+async function changePw(username) {
+  const pw = document.getElementById("newPwInput").value;
+  if (!pw || pw.length < 4 || pw.length > 32) { showAlert(t('admin_error'), t('admin_password_required')); return; }
+  const res = await api("PUT", "/users/" + encodeURIComponent(username) + "/password", { password: pw });
+  if (!res.error) { showAlert(t('admin_success'), t('admin_password_changed')); document.getElementById("newPwInput").value = ""; }
+  else { showAlert(t('admin_error'), res.error || t('admin_uid_fail')); }
+}
+
+// UID
+function showUid(username) {
+  const u = usersData.find(x => x.username === username);
+  document.getElementById("uidUserInfo").innerHTML = t('admin_action_rename') + " <strong>" + username + "</strong> " + t('admin_action_uid') + "（" + t('admin_modal_uid_current') + " <code>" + (u ? u.uid : '') + "</code>）";
+  document.getElementById("uidInput").value = u ? u.uid : "";
+  document.getElementById("uidModal").dataset.username = username;
+  document.getElementById("uidModal").classList.add("active");
+}
+
+async function confirmUid() {
+  const username = document.getElementById("uidModal").dataset.username;
+  const uid = document.getElementById("uidInput").value.trim();
+  if (!uid) { showAlert(t('admin_error'), t('admin_uid_required')); return; }
+  const res = await api("PUT", "/users/" + encodeURIComponent(username) + "/uid", { uid });
+  if (!res.error) { closeModal("uidModal"); loadUsers(); }
+  else { showAlert(t('admin_error'), res.error || t('admin_uid_fail')); }
+}
+
+// Ban
+function populateBanDate() {
+  const now = new Date();
+  const y = now.getFullYear();
+  var ySel = document.getElementById("banYear");
+  if (ySel.options.length > 0) return;
+  for (var i = y; i < y + 100; i++) {
+    ySel.options.add(new Option(i + "年", i));
+  }
+  ySel.value = y;
+  var mSel = document.getElementById("banMonth");
+  for (var i = 1; i <= 12; i++) {
+    mSel.options.add(new Option(i + "月", i.toString().padStart(2,'0')));
+  }
+  mSel.value = (now.getMonth()+1).toString().padStart(2,'0');
+  var dSel = document.getElementById("banDay");
+  for (var i = 1; i <= 31; i++) {
+    dSel.options.add(new Option(i + "日", i.toString().padStart(2,'0')));
+  }
+  dSel.value = now.getDate().toString().padStart(2,'0');
+  var hSel = document.getElementById("banHour");
+  for (var i = 0; i <= 23; i++) {
+    hSel.options.add(new Option(i + "时", i.toString().padStart(2,'0')));
+  }
+  hSel.value = now.getHours().toString().padStart(2,'0');
+  var minSel = document.getElementById("banMinute");
+  for (var i = 0; i <= 59; i++) {
+    minSel.options.add(new Option(i + "分", i.toString().padStart(2,'0')));
+  }
+  minSel.value = "00";
+}
+
+function showBan(username) {
+  document.getElementById("banUserInfo").innerHTML = t('admin_action_ban') + ": <strong>" + username + "</strong>";
+  document.getElementById("banReason").value = "";
+  document.getElementById("banMode").value = "permanent";
+  document.getElementById("banExpiryGroup").style.display = "none";
+  document.getElementById("banModal").dataset.username = username;
+  document.getElementById("banModal").classList.add("active");
+}
+
+function toggleBanExpiry() {
+  var show = document.getElementById("banMode").value === "timed";
+  document.getElementById("banExpiryGroup").style.display = show ? "block" : "none";
+  if (show) populateBanDate();
+}
+
+async function confirmBan() {
+  const username = document.getElementById("banModal").dataset.username;
+  const reason = document.getElementById("banReason").value;
+  const mode = document.getElementById("banMode").value;
+  const body = { reason, permanent: mode === "permanent" };
+  if (mode === "timed") {
+    var y = document.getElementById("banYear").value;
+    var m = document.getElementById("banMonth").value;
+    var d = document.getElementById("banDay").value;
+    var h = document.getElementById("banHour").value;
+    var min = document.getElementById("banMinute").value;
+    body.expires_at = y + "-" + m + "-" + d + " " + h + ":" + min + ":00";
+  }
+  const res = await api("POST", "/users/" + encodeURIComponent(username) + "/ban", body);
+  if (!res.error) { closeModal("banModal"); loadUsers(); }
+  else { showAlert(t('admin_error'), res.error || t('admin_ban_fail')); }
+}
+
+async function unbanUser(username) {
+  showConfirm(t('admin_modal_confirm_title'), t('admin_confirm_unban') + username + "？", null, async function() {
+    const res = await api("POST", "/users/" + encodeURIComponent(username) + "/unban");
+    if (!res.error) { loadUsers(); }
+    else { showAlert(t('admin_error'), res.error || t('admin_unban_fail')); }
+  });
+}
+
+// Rename
+function showRename(username) {
+  document.getElementById("renameUserInfo").innerHTML = t('admin_action_rename') + ": <strong>" + username + "</strong>  →";
+  document.getElementById("renameInput").value = "";
+  document.getElementById("renameModal").dataset.username = username;
+  document.getElementById("renameModal").classList.add("active");
+}
+
+async function confirmRename() {
+  const username = document.getElementById("renameModal").dataset.username;
+  const newName = document.getElementById("renameInput").value;
+  if (!newName || newName.length < 4 || newName.length > 32) { showAlert(t('admin_error'), t('admin_username_required')); return; }
+  const res = await api("PUT", "/users/" + encodeURIComponent(username) + "/rename", { new_username: newName });
+  if (!res.error) { closeModal("renameModal"); loadUsers(); }
+  else { showAlert(t('admin_error'), res.error || t('admin_rename_fail')); }
+}
+
+// Custom confirm / alert
+let _confirmCb = null;
+
+function showConfirm(title, text, icon, cb) {
+  document.getElementById("confirmTitle").textContent = title;
+  document.getElementById("confirmText").textContent = text;
+  document.getElementById("confirmIcon").textContent = icon || "!";
+  _confirmCb = cb;
+  document.getElementById("confirmModal").classList.add("active");
+}
+
+function closeConfirm() {
+  document.getElementById("confirmModal").classList.remove("active");
+  _confirmCb = null;
+}
+
+function confirmAction() {
+  document.getElementById("confirmModal").classList.remove("active");
+  if (_confirmCb) { _confirmCb(); _confirmCb = null; }
+}
+
+function showAlert(title, text, icon) {
+  document.getElementById("alertTitle").textContent = title;
+  document.getElementById("alertText").textContent = text;
+  document.getElementById("alertIcon").textContent = icon || "i";
+  document.getElementById("alertModal").classList.add("active");
+}
+
+function closeAlert() {
+  document.getElementById("alertModal").classList.remove("active");
+} 
+
+// Sidebar toggle (mobile)
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebarBackdrop").classList.toggle("active");
+}
+
+// Modal helpers
+function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+
+// Init
+translatePage();
+if (getToken()) { enterApp(); }
+</script>
+</body>
+</html>

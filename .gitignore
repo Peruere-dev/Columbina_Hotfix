@@ -1,0 +1,30 @@
+# Binaries
+columbina-hotfix
+columbinahotfix
+
+# Runtime
+config.json
+
+# Logs
+*.log
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+
+# Editor
+.idea/
+.vscode/
+
+# Hotfix: only track example configs per platform
+hotfix/**/*.json
+!hotfix/CNREL/Android/4.6.0.json
+!hotfix/CNREL/Win/4.6.0.json
+!hotfix/CNREL/iOS/4.6.0.json
+!hotfix/OSREL/Android/4.6.0.json
+!hotfix/OSREL/Win/4.6.0.json
+!hotfix/OSREL/iOS/4.6.0.json
+
+# Converter script (only used locally)
+convert_hotfix.py
