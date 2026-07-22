@@ -2,7 +2,6 @@
 
 原神 LAN 派发服务器（Dispatch Server），基于 Go 实现，支持热更新文件分发、登录验证、区域调度及网页管理后台。
 
-
 ## 功能
 
 - 热更新文件分发（按版本和平台：Android / iOS / Win）
@@ -146,4 +145,5 @@ ColumbinaHotfix/
 ## 参考项目
 
 - [nod-krai-gi](https://github.com/mjolsic/nod-krai-gi) — Rust 实现的原神 Dispatch / Game Server
-- [LunaGC](https://github.com/LunaGC/LunaGC-6.5.0) — Java (Grasscutter) 原神服务端
+- [Grasscutter](https://github.com/Grasscutters/Grasscutter) — Java 原神服务端，本项目 dispatch 协议参考了其实现
+- [LunaGC](https://github.com/LunaGC/LunaGC-6.5.0) — 基于 Grasscutter 的原神服务端
