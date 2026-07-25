@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/python3
+#!/usr/bin/env python3
 """Serveo tunnel, update config, exit."""
 
 import json
@@ -11,7 +11,7 @@ import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONFIG_JSON = os.path.join(ROOT, "config.json")
-LOG = "/data/data/com.termux/files/usr/tmp/serveo.log"
+LOG = os.path.join(ROOT, "serveo.log")
 URL_FILE = os.path.join(ROOT, ".tunnel_url")
 
 
