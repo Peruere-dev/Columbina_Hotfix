@@ -132,7 +132,7 @@ func startREPL() {
 			case "reload":
 				doReload()
 			case "stop":
-				fmt.Println("  Shutting down... bye")
+				fmt.Println("  " + L("repl_stop_msg"))
 				close(shutdownCh)
 				return
 			}
@@ -141,40 +141,39 @@ func startREPL() {
 }
 
 func printHelp() {
-	fmt.Println("  help    — show this help")
-	fmt.Println("  status  — server status")
-	fmt.Println("  stats   — request stats")
-	fmt.Println("  reload  — reload config.json")
-	fmt.Println("  stop    — shutdown")
+	fmt.Println("  " + L("repl_help_help"))
+	fmt.Println("  " + L("repl_help_status"))
+	fmt.Println("  " + L("repl_help_stats"))
+	fmt.Println("  " + L("repl_help_reload"))
+	fmt.Println("  " + L("repl_help_stop"))
 }
 
 func printStatus() {
 	uptime := time.Since(startTime)
 	dash := getDashboardStats()
-	fmt.Printf("  PID: %d  Uptime: %s  Requests: %d\n",
+	fmt.Printf("  "+L("repl_status")+"\n",
 		os.Getpid(), fmtDuration(uptime), reqCount.Load())
-	fmt.Printf("  Users: %d total, %d active, %d banned\n",
+	fmt.Printf("  "+L("repl_status_users")+"\n",
 		dash["total_users"], dash["active_users"], dash["banned_users"])
 }
 
 func printStats() {
 	stats := getVersionStats()
 	if len(stats) == 0 {
-		fmt.Println("  (no stats yet)")
+		fmt.Println("  " + L("repl_stats_empty"))
 		return
 	}
 	for _, s := range stats {
-		fmt.Printf("  %s/%s: %d req\n", s.Version, s.Platform, s.RequestCount)
+		fmt.Printf("  "+L("repl_stats_line")+"\n", s.Version, s.Platform, s.RequestCount)
 	}
 }
 
 func doReload() {
 	if err := reloadConfig(); err != nil {
-		fmt.Printf("  %sError:%s %v\n", cRed, cReset, err)
+		logError("reload: " + err.Error())
 		return
 	}
-	fmt.Println("  Config reloaded")
-	logInfo("配置已重载")
+	logInfo(L("repl_reload_ok"))
 }
 
 func fmtDuration(d time.Duration) string {

@@ -135,5 +135,16 @@
   "admin_settings_save": "Save Settings",
   "admin_settings_saved": "Settings saved",
   "admin_settings_old_password_required": "Please enter current password",
-  "admin_settings_nothing": "Nothing to change"
+  "admin_settings_nothing": "Nothing to change",
+  "repl_help_help": "help    — show this help",
+  "repl_help_status": "status  — server status",
+  "repl_help_stats": "stats   — request stats",
+  "repl_help_reload": "reload  — reload config.json",
+  "repl_help_stop": "stop    — shutdown",
+  "repl_status": "PID: %d  Uptime: %s  Requests: %d",
+  "repl_status_users": "Users: %d total, %d active, %d banned",
+  "repl_stats_empty": "(no stats yet)",
+  "repl_stats_line": "%s/%s: %d req",
+  "repl_reload_ok": "Config reloaded",
+  "repl_stop_msg": "Shutting down... bye"
 }

@@ -20,7 +20,7 @@ func setupSignal() {
 		}
 
 		fmt.Println()
-		logInfo("正在关闭服务器...")
+		logInfo(L("shutting_down"))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

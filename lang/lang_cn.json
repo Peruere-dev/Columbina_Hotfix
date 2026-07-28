@@ -135,5 +135,16 @@
   "admin_settings_save": "保存设置",
   "admin_settings_saved": "设置已保存",
   "admin_settings_old_password_required": "请输入原密码",
-  "admin_settings_nothing": "没有要修改的内容"
+  "admin_settings_nothing": "没有要修改的内容",
+  "repl_help_help": "help    — 显示此帮助",
+  "repl_help_status": "status  — 运行状态",
+  "repl_help_stats": "stats   — 请求统计",
+  "repl_help_reload": "reload  — 重载 config.json",
+  "repl_help_stop": "stop    — 关闭服务器",
+  "repl_status": "PID: %d  运行: %s  请求: %d",
+  "repl_status_users": "用户: %d 总计, %d 活跃, %d 封禁",
+  "repl_stats_empty": "(暂无统计)",
+  "repl_stats_line": "%s/%s: %d 次请求",
+  "repl_reload_ok": "配置已重载",
+  "repl_stop_msg": "正在关闭...再见"
 }
