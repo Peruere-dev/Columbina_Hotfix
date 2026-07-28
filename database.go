@@ -269,8 +269,12 @@ func isUserBannedInfo(username string) (banned bool, reason string, permanent bo
 
 func getDashboardStats() map[string]int {
 	var total, banned int
-	db.QueryRow("SELECT COUNT(*) FROM accounts").Scan(&total)
-	db.QueryRow("SELECT COUNT(*) FROM accounts WHERE banned = 1 OR ban_permanent = 1").Scan(&banned)
+	if err := db.QueryRow("SELECT COUNT(*) FROM accounts").Scan(&total); err != nil {
+		dbLog.Printf("getDashboardStats total: %v", err)
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM accounts WHERE banned = 1 OR ban_permanent = 1").Scan(&banned); err != nil {
+		dbLog.Printf("getDashboardStats banned: %v", err)
+	}
 	return map[string]int{
 		"total_users":  total,
 		"active_users": total - banned,
@@ -336,7 +340,9 @@ func resetUserToken(username string) error {
 
 func getHotUpdateCount() int {
 	var count int
-	db.QueryRow("SELECT hot_update_count FROM stats WHERE id = 1").Scan(&count)
+	if err := db.QueryRow("SELECT hot_update_count FROM stats WHERE id = 1").Scan(&count); err != nil {
+		dbLog.Printf("getHotUpdateCount: %v", err)
+	}
 	return count
 }
 

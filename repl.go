@@ -173,6 +173,7 @@ func doReload() {
 		logError("reload: " + err.Error())
 		return
 	}
+	reloadHotfixCache()
 	logInfo(L("repl_reload_ok"))
 }
 

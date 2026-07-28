@@ -78,6 +78,9 @@ func loadKeys() error {
 		}
 		encryptionKeys[id] = rsaPub
 	}
+	if _, ok := encryptionKeys[4]; !ok {
+		writeLog("[WARN] game_keys: 4_Pub.der not found, some clients may fail")
+	}
 	return nil
 }
 

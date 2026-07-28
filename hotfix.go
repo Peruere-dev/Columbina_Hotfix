@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 type HotfixData struct {
@@ -28,6 +29,11 @@ type HotfixResVersion struct {
 	VersionSuffix string `json:"VersionSuffix,omitempty"`
 	Branch        string `json:"Branch,omitempty"`
 }
+
+var (
+	hotfixCache   map[string]*HotfixData
+	hotfixCacheMu sync.RWMutex
+)
 
 var versionNumRe = regexp.MustCompile(`[^0-9.]`)
 
@@ -60,6 +66,10 @@ func hotfixPath(elem ...string) string {
 	return filepath.Join(append([]string{filepath.Dir(exe), "hotfix"}, elem...)...)
 }
 
+func cacheKey(prefix, platform, verNum string) string {
+	return prefix + "/" + platform + "/" + verNum
+}
+
 func LoadHotfixConfig(versionStr string) *HotfixData {
 	if versionStr == "" {
 		return nil
@@ -71,18 +81,91 @@ func LoadHotfixConfig(versionStr string) *HotfixData {
 		return nil
 	}
 
-	path := hotfixPath(prefix, platform, verNum+".json")
+	key := cacheKey(prefix, platform, verNum)
+	hotfixCacheMu.RLock()
+	cfg, ok := hotfixCache[key]
+	hotfixCacheMu.RUnlock()
+	if ok {
+		return cfg
+	}
 
+	path := hotfixPath(prefix, platform, verNum+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
-
-	var cfg HotfixData
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	var hd HotfixData
+	if err := json.Unmarshal(data, &hd); err != nil {
 		return nil
 	}
-	return &cfg
+	return &hd
+}
+
+func initHotfixCache() {
+	hotfixCacheMu.Lock()
+	defer hotfixCacheMu.Unlock()
+	hotfixCache = make(map[string]*HotfixData)
+
+	root := hotfixPath()
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		logWarn(fmt.Sprintf("hotfix directory not found: %s", root))
+		return
+	}
+
+	var count int
+	for _, region := range entries {
+		if !region.IsDir() {
+			continue
+		}
+		rName := region.Name()
+		platDir := hotfixPath(rName)
+		plats, err := os.ReadDir(platDir)
+		if err != nil {
+			continue
+		}
+		for _, plat := range plats {
+			if !plat.IsDir() {
+				continue
+			}
+			pName := plat.Name()
+			verDir := hotfixPath(rName, pName)
+			vers, err := os.ReadDir(verDir)
+			if err != nil {
+				continue
+			}
+			for _, ver := range vers {
+				if ver.IsDir() || !strings.HasSuffix(ver.Name(), ".json") {
+					continue
+				}
+				verNum := strings.TrimSuffix(ver.Name(), ".json")
+				path := hotfixPath(rName, pName, ver.Name())
+				data, err := os.ReadFile(path)
+				if err != nil {
+					continue
+				}
+				var hd HotfixData
+				if err := json.Unmarshal(data, &hd); err != nil {
+					continue
+				}
+				key := cacheKey(rName, pName, verNum)
+				hotfixCache[key] = &hd
+				count++
+			}
+		}
+	}
+	logInfo(fmt.Sprintf("hotfix: cached %d configs", count))
+}
+
+func reloadHotfixCache() {
+	if _, err := os.Stat(hotfixPath()); os.IsNotExist(err) {
+		logWarn("hotfix directory removed, cache cleared")
+		hotfixCacheMu.Lock()
+		hotfixCache = make(map[string]*HotfixData)
+		hotfixCacheMu.Unlock()
+		return
+	}
+	initHotfixCache()
 }
 
 func (h *HotfixData) BuildRegionInfoParams(ip string, port int, versionStr string) RegionInfoParams {
@@ -91,7 +174,6 @@ func (h *HotfixData) BuildRegionInfoParams(ip string, port int, versionStr strin
 		areaType = "OS"
 	}
 
-	// Derive bak fields from URLs
 	resourceBak := extractBak(h.ResourceURL)
 	dataBak := extractBak(h.DataURL)
 
@@ -109,20 +191,20 @@ func (h *HotfixData) BuildRegionInfoParams(ip string, port int, versionStr strin
 	}
 
 	return RegionInfoParams{
-		GateserverIP:              ip,
-		GateserverPort:            uint32(port),
-		AreaType:                  areaType,
-		ResourceURL:               h.ResourceURL,
-		DataURL:                   h.DataURL,
-		ResourceURLBak:            resourceBak,
-		DataURLBak:                dataBak,
-		ClientDataVersion:         h.DataVersion,
-		ClientSilenceDataVersion:  h.SilenceVersion,
-		ClientDataMD5:             h.DataMD5,
-		ClientSilenceDataMD5:      h.SilenceMD5,
-		ClientVersionSuffix:       h.VersionSuffix,
+		GateserverIP:               ip,
+		GateserverPort:             uint32(port),
+		AreaType:                   areaType,
+		ResourceURL:                h.ResourceURL,
+		DataURL:                    h.DataURL,
+		ResourceURLBak:             resourceBak,
+		DataURLBak:                 dataBak,
+		ClientDataVersion:          h.DataVersion,
+		ClientSilenceDataVersion:   h.SilenceVersion,
+		ClientDataMD5:              h.DataMD5,
+		ClientSilenceDataMD5:       h.SilenceMD5,
+		ClientVersionSuffix:        h.VersionSuffix,
 		ClientSilenceVersionSuffix: h.SilenceSuffix,
-		ResVersionConfig:          resVer,
+		ResVersionConfig:           resVer,
 	}
 }
 
@@ -137,7 +219,6 @@ func extractBak(rawURL string) string {
 	return rawURL[idx+1:]
 }
 
-// GetHotfixPlatforms returns a list of available prefixes+platforms for the admin dashboard.
 func GetHotfixPlatforms() []string {
 	root := hotfixPath()
 	entries, err := os.ReadDir(root)
@@ -153,7 +234,6 @@ func GetHotfixPlatforms() []string {
 	return result
 }
 
-// GetHotfixVersions returns version strings available for a given prefix+platform.
 func GetHotfixVersions(prefix, platform string) []string {
 	dir := hotfixPath(prefix, platform)
 	entries, err := os.ReadDir(dir)
@@ -167,11 +247,4 @@ func GetHotfixVersions(prefix, platform string) []string {
 		}
 	}
 	return result
-}
-
-func init() {
-	hotfixDir := hotfixPath()
-	if _, err := os.Stat(hotfixDir); os.IsNotExist(err) {
-		fmt.Printf("WARNING: hotfix directory not found at %s\n", hotfixDir)
-	}
 }
