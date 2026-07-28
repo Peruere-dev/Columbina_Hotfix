@@ -34,8 +34,7 @@ func main() {
 	loadLang(configPath)
 	initLogging()
 	initDataLogging()
-	logInfo(L("config_loading", configPath))
-
+logInfo(L("config_loading", filepath.Base(configPath)))
 	if err := initDB(); err != nil {
 		logError("Failed to init database: " + err.Error())
 		os.Exit(1)
@@ -53,7 +52,7 @@ func main() {
 	}
 
 	keysDir := findKeysDir()
-	logInfo(L("keys_loading", keysDir))
+	logInfo(L("keys_loading", filepath.Base(keysDir)+"/"))
 	if err := loadKeys(keysDir); err != nil {
 		logError("Failed to load keys: " + err.Error())
 		os.Exit(1)
