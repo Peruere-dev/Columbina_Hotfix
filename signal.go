@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,13 +25,11 @@ func setupSignal() {
 						logInfo("SIGHUP received: config + hotfix reloaded")
 					}
 				default:
-					fmt.Println()
 					logInfo(L("shutting_down"))
 					shutdown()
 					return
 				}
 			case <-shutdownCh:
-				fmt.Println()
 				logInfo(L("shutting_down"))
 				shutdown()
 				return

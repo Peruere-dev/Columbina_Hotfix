@@ -132,7 +132,6 @@ func startREPL() {
 			case "reload":
 				doReload()
 			case "stop":
-				fmt.Println("  " + L("repl_stop_msg"))
 				close(shutdownCh)
 				return
 			}
