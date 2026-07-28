@@ -105,7 +105,7 @@ func showStartupBox() {
 		cDim, cReset, cBlue, cReset, admin,
 		inner-2-9-len(admin), "", cDim, cReset)
 
-	fmt.Printf("%s│%s  PID       %s%*s%s│%s\n",
+	fmt.Printf("%s│%s  PID      %s%*s%s│%s\n",
 		cDim, cReset, pid,
 		inner-2-9-len(pid), "", cDim, cReset)
 
