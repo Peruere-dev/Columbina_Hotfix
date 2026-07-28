@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"embed"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -14,6 +15,18 @@ import (
 	"sort"
 )
 
+//go:embed keys/dispatchKey.bin
+var embedDispatchKey []byte
+
+//go:embed keys/dispatchSeed.bin
+var embedDispatchSeed []byte
+
+//go:embed keys/SigningKey.der
+var embedSigningKey []byte
+
+//go:embed keys/game_keys
+var embedGameKeys embed.FS
+
 var (
 	dispatchKey    []byte
 	dispatchSeed   []byte
@@ -21,11 +34,11 @@ var (
 	encryptionKeys map[int]*rsa.PublicKey
 )
 
-func loadKeys(keysDir string) error {
-	dispatchKey = readFileOrPanic(filepath.Join(keysDir, "dispatchKey.bin"))
-	dispatchSeed = readFileOrPanic(filepath.Join(keysDir, "dispatchSeed.bin"))
+func loadKeys() error {
+	dispatchKey = readKey("dispatchKey.bin", embedDispatchKey)
+	dispatchSeed = readKey("dispatchSeed.bin", embedDispatchSeed)
 
-	signDer := readFileOrPanic(filepath.Join(keysDir, "SigningKey.der"))
+	signDer := readKey("SigningKey.der", embedSigningKey)
 	key, err := x509.ParsePKCS8PrivateKey(signDer)
 	if err != nil {
 		return fmt.Errorf("parse SigningKey.der: %w", err)
@@ -38,18 +51,23 @@ func loadKeys(keysDir string) error {
 
 	encryptionKeys = make(map[int]*rsa.PublicKey)
 	pattern := regexp.MustCompile(`(\d+)_Pub\.der`)
-	entries, err := os.ReadDir(filepath.Join(keysDir, "game_keys"))
+
+	gameEntries, err := embedGameKeys.ReadDir("keys/game_keys")
 	if err != nil {
-		return fmt.Errorf("read game_keys: %w", err)
+		return fmt.Errorf("read embedded game_keys: %w", err)
 	}
-	for _, e := range entries {
+	for _, e := range gameEntries {
 		m := pattern.FindStringSubmatch(e.Name())
 		if m == nil {
 			continue
 		}
 		var id int
 		fmt.Sscanf(m[1], "%d", &id)
-		pubDer := readFileOrPanic(filepath.Join(keysDir, "game_keys", e.Name()))
+
+		pubDer, err := readGameKey(e.Name())
+		if err != nil {
+			return fmt.Errorf("read %s: %w", e.Name(), err)
+		}
 		pub, err := x509.ParsePKIXPublicKey(pubDer)
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", e.Name(), err)
@@ -63,12 +81,19 @@ func loadKeys(keysDir string) error {
 	return nil
 }
 
-func readFileOrPanic(path string) []byte {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		panic(fmt.Sprintf("failed to read %s: %v", path, err))
+func readKey(name string, embedData []byte) []byte {
+	if data, err := os.ReadFile(filepath.Join("keys", name)); err == nil {
+		return data
 	}
-	return data
+	return embedData
+}
+
+func readGameKey(name string) ([]byte, error) {
+	diskPath := filepath.Join("keys", "game_keys", name)
+	if data, err := os.ReadFile(diskPath); err == nil {
+		return data, nil
+	}
+	return embedGameKeys.ReadFile("keys/game_keys/" + name)
 }
 
 func xorEncrypt(data, key []byte) []byte {

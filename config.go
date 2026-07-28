@@ -161,21 +161,6 @@ func findConfig() (string, error) {
 	return p, saveDefaultConfig(p)
 }
 
-func findKeysDir() string {
-	exe, err := os.Executable()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: cannot find executable path: %v\n", err)
-		return "keys"
-	}
-	dir := filepath.Dir(exe)
-	d := filepath.Join(dir, "keys")
-	if _, err := os.Stat(filepath.Join(d, "dispatchKey.bin")); err == nil {
-		return d
-	}
-	fmt.Fprintf(os.Stderr, "Warning: keys directory not found next to binary\n")
-	return d
-}
-
 func loadConfig(path string) error {
 	cfg = defaultConfig()
 	data, err := os.ReadFile(path)

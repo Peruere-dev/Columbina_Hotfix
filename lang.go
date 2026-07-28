@@ -6,7 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	_ "embed"
 )
+
+//go:embed lang/lang_cn.json
+var embedLangCN []byte
+
+//go:embed lang/lang_en.json
+var embedLangEN []byte
 
 var (
 	langStrings map[string]string
@@ -18,17 +26,24 @@ func loadLang(path string) {
 	if getConfig().Language == 1 {
 		langFile = "lang_en.json"
 	}
-	dir := filepath.Dir(path)
-	fullPath := filepath.Join(dir, "lang", langFile)
-	data, err := os.ReadFile(fullPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[LANG] failed to load %s: %v\n", fullPath, err)
-		langStrings = make(map[string]string)
-		return
+
+	var embedData []byte
+	if langFile == "lang_cn.json" {
+		embedData = embedLangCN
+	} else {
+		embedData = embedLangEN
 	}
+
+	dir := filepath.Dir(path)
+	diskPath := filepath.Join(dir, "lang", langFile)
+	data, err := os.ReadFile(diskPath)
+	if err != nil {
+		data = embedData
+	}
+
 	m := make(map[string]string)
 	if err := json.Unmarshal(data, &m); err != nil {
-		fmt.Fprintf(os.Stderr, "[LANG] failed to parse %s: %v\n", fullPath, err)
+		fmt.Fprintf(os.Stderr, "[LANG] failed to parse %s: %v\n", langFile, err)
 		langStrings = make(map[string]string)
 		return
 	}

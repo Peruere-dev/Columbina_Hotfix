@@ -51,9 +51,8 @@ logInfo(L("config_loading", filepath.Base(configPath)))
 		logInfo(fmt.Sprintf("默认管理员 — 用户名: %s  密码: %s  面板: %s", newUser, newPass, adminURL))
 	}
 
-	keysDir := findKeysDir()
-	logInfo(L("keys_loading", filepath.Base(keysDir)+"/"))
-	if err := loadKeys(keysDir); err != nil {
+	logInfo(L("keys_loading", "keys/"))
+	if err := loadKeys(); err != nil {
 		logError("Failed to load keys: " + err.Error())
 		os.Exit(1)
 	}
