@@ -20,9 +20,29 @@ case "$choice" in
   *) echo "Invalid choice"; exit 1 ;;
 esac
 
+echo ""
+echo "Select build type:"
+echo "  1) debug   — full symbols, source paths exposed"
+echo "  2) release — stripped, -trimpath, smaller binary"
+printf "Choice [1-2]: "
+read bt
+
+case "$bt" in
+  1) MODE=debug
+     LDFLAGS="" ;;
+  2) MODE=release
+     LDFLAGS="-s -w"
+     TRIM="-trimpath" ;;
+  *) echo "Invalid choice"; exit 1 ;;
+esac
+
 ext=""
 [ "$GOOS" = "windows" ] && ext=".exe"
-out="ColumbinaHotfix_${GOOS}_${GOARCH}${ext}"
+if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "arm64" ]; then
+  out="ColumbinaHotfix${ext}"
+else
+  out="ColumbinaHotfix_${GOOS}_${GOARCH}_${MODE}${ext}"
+fi
 
-env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build -o "$out" .
+env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build $TRIM -ldflags="$LDFLAGS" -o "$out" .
 echo "Built: $out"

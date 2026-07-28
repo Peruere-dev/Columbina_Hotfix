@@ -10,23 +10,23 @@ import (
 )
 
 type HotfixData struct {
-	ResourceURL    string            `json:"resource_url"`
-	DataURL        string            `json:"data_url"`
-	DataVersion    uint32            `json:"data_version,omitempty"`
-	SilenceVersion uint32            `json:"silence_version,omitempty"`
-	DataMD5        string            `json:"data_md5,omitempty"`
-	SilenceMD5     string            `json:"silence_md5,omitempty"`
-	VersionSuffix  string            `json:"version_suffix,omitempty"`
-	SilenceSuffix  string            `json:"silence_suffix,omitempty"`
-	ResVersion     *HotfixResVersion `json:"res_version,omitempty"`
+	ResourceURL    string            `json:"ResourceUrl"`
+	DataURL        string            `json:"DataUrl"`
+	DataVersion    uint32            `json:"ClientDataVersion,omitempty"`
+	SilenceVersion uint32            `json:"ClientSilenceDataVersion,omitempty"`
+	DataMD5        string            `json:"ClientDataMd5,omitempty"`
+	SilenceMD5     string            `json:"ClientSilenceDataMd5,omitempty"`
+	VersionSuffix  string            `json:"ClientVersionSuffix,omitempty"`
+	SilenceSuffix  string            `json:"ClientSilenceVersionSuffix,omitempty"`
+	ResVersion     *HotfixResVersion `json:"ResVersionConfig,omitempty"`
 }
 
 type HotfixResVersion struct {
-	Version       uint32 `json:"version,omitempty"`
-	Md5           string `json:"md5,omitempty"`
-	ReleaseSize   string `json:"release_size,omitempty"`
-	VersionSuffix string `json:"version_suffix,omitempty"`
-	Branch        string `json:"branch,omitempty"`
+	Version       uint32 `json:"Version,omitempty"`
+	Md5           string `json:"Md5,omitempty"`
+	ReleaseSize   string `json:"ReleaseTotalSize,omitempty"`
+	VersionSuffix string `json:"VersionSuffix,omitempty"`
+	Branch        string `json:"Branch,omitempty"`
 }
 
 var versionNumRe = regexp.MustCompile(`[^0-9.]`)
