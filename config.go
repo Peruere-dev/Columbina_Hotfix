@@ -184,3 +184,13 @@ func loadConfig(path string) error {
 	}
 	return json.Unmarshal(data, &cfg)
 }
+
+func reloadConfig() error {
+	cfgMu.Lock()
+	defer cfgMu.Unlock()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &cfg)
+}

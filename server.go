@@ -28,7 +28,7 @@ func initLogging() {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(io.MultiWriter(os.Stdout, logFile), "", log.Ltime|log.Ldate)
+	logger = log.New(logFile, "", log.Ltime|log.Ldate)
 }
 
 func initDataLogging() {
@@ -59,7 +59,7 @@ func rotateLog(path string) {
 	}
 	if path == "server.log" {
 		logFile = f
-		logger = log.New(io.MultiWriter(os.Stdout, logFile), "", log.Ltime|log.Ldate)
+		logger = log.New(logFile, "", log.Ltime|log.Ldate)
 	} else if path == getConfig().DataLog.Path {
 		dataLogFile = f
 		dataLogger = log.New(dataLogFile, "", log.Ltime|log.Ldate)
@@ -91,6 +91,8 @@ func NewDispatchServer() *DispatchServer {
 
 func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	reqCount.Add(1)
+
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -105,7 +107,7 @@ func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeDataLog(fmt.Sprintf("[%s] %s %s (no-op)", r.RemoteAddr, r.Method, r.URL.RequestURI()))
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]int{"code": 0})
-		fmt.Printf("[%s] %s %s [%dms]\n", r.RemoteAddr, r.Method, r.URL.RequestURI(), time.Since(start).Milliseconds())
+		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, time.Since(start))
 		return
 	}
 
@@ -117,12 +119,12 @@ func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler := s.route(r.Method, r.URL.Path)
 	if handler != nil {
 		handler(w, r, bodyBytes)
-		elapsed := time.Since(start).Milliseconds()
-		writeDataLog(fmt.Sprintf("%s [%dms]", logStr, elapsed))
-		fmt.Printf("[%s] %s %s [%dms]\n", r.RemoteAddr, r.Method, r.URL.RequestURI(), elapsed)
+		elapsed := time.Since(start)
+		writeDataLog(fmt.Sprintf("%s [%dms]", logStr, elapsed.Milliseconds()))
+		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, elapsed)
 	} else {
 		writeDataLog(fmt.Sprintf("%s 404", logStr))
-		fmt.Printf("[%s] %s %s 404\n", r.RemoteAddr, r.Method, r.URL.RequestURI())
+		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 404, time.Since(start))
 		http.NotFound(w, r)
 	}
 }

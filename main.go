@@ -1,20 +1,17 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
 var httpServer *http.Server
 
 func main() {
-	fmt.Println("ColumbinaHotfix")
+	startTime = time.Now()
 
 	var err error
 	configPath, err = findConfig()
@@ -28,7 +25,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// chdir to binary directory so relative paths (config, DB, keys) work
 	if dir := filepath.Dir(configPath); dir != "." {
 		if err := os.Chdir(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to chdir to %s: %v\n", dir, err)
@@ -36,36 +32,34 @@ func main() {
 	}
 
 	loadLang(configPath)
-
-	fmt.Printf(L("config_loading"), configPath)
-	fmt.Println()
+	initLogging()
+	initDataLogging()
+	logInfo(L("config_loading", configPath))
 
 	if err := initDB(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to init database: %v\n", err)
+		logError("Failed to init database: " + err.Error())
 		os.Exit(1)
 	}
 
 	newUser, newPass, err := seedAdminConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to seed admin config: %v\n", err)
+		logError("Failed to seed admin config: " + err.Error())
 		os.Exit(1)
 	}
 	if newPass != "" {
-		fmt.Printf("[ADMIN] 默认管理员 — 用户名: %s  密码: %s  面板: http://%s:%d%s\n",
-			newUser, newPass,
+		adminURL := fmt.Sprintf("http://%s:%d%s",
 			getConfig().Server.AccessAddress, getConfig().Server.AccessPort, getConfig().Admin.Route)
+		logInfo(fmt.Sprintf("默认管理员 — 用户名: %s  密码: %s  面板: %s", newUser, newPass, adminURL))
 	}
 
 	keysDir := findKeysDir()
-	fmt.Printf(L("keys_loading"), keysDir)
-	fmt.Println()
+	logInfo(L("keys_loading", keysDir))
 	if err := loadKeys(keysDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load keys: %v\n", err)
+		logError("Failed to load keys: " + err.Error())
 		os.Exit(1)
 	}
 
-	initLogging()
-	initDataLogging()
+	showStartupBox()
 
 	addr := fmt.Sprintf("%s:%d", getConfig().Server.BindAddress, getConfig().Server.BindPort)
 
@@ -87,37 +81,17 @@ func main() {
 				return httpServer.ListenAndServeTLS(getConfig().Server.TLS.CertFile, getConfig().Server.TLS.KeyFile)
 			}
 		}
-		fmt.Printf(L("listening"), fmt.Sprintf("%s://%s", schema, addr))
-		fmt.Println()
+		logInfo(fmt.Sprintf(L("listening"), fmt.Sprintf("%s://%s", schema, addr)))
 		writeLog(fmt.Sprintf(L("server_started"), fmt.Sprintf("%s://%s", schema, addr)))
 		if err := listenFn(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, L("server_error"), err)
-			fmt.Println()
+			logError(fmt.Sprintf(L("server_error"), err))
 			writeLog(fmt.Sprintf(L("server_error"), err))
 			os.Exit(1)
 		}
 	}()
 
-	// Wait for signal
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-	fmt.Println(L("shutting_down"))
+	startREPL()
+	setupSignal()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	httpServer.Shutdown(ctx)
-
-	time.Sleep(100 * time.Millisecond)
-
-	logMu.Lock()
-	if logFile != nil {
-		logFile.Close()
-	}
-	logMu.Unlock()
-	if dataLogFile != nil {
-		dataLogMu.Lock()
-		dataLogFile.Close()
-		dataLogMu.Unlock()
-	}
+	select {}
 }
