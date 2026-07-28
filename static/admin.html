@@ -378,7 +378,7 @@ td .actions .act-btn:active { transform: translateY(0); }
         <div class="table-scroll">
           <table>
             <thead><tr>
-              <th data-i18n="admin_dashboard_version">版本</th><th data-i18n="admin_dashboard_platform">平台</th><th data-i18n="admin_dashboard_requests">请求数</th><th data-i18n="admin_dashboard_last_request">最后请求</th>
+              <th data-i18n="admin_dashboard_version">版本</th><th data-i18n="admin_dashboard_requests">请求数</th><th data-i18n="admin_dashboard_last_request">最后请求</th>
             </tr></thead>
             <tbody id="versionStatsBody"></tbody>
           </table>
@@ -691,10 +691,9 @@ async function loadStats() {
   `;
   const vs = res.version_stats || [];
   const html = vs.length === 0
-    ? '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px">' + t('admin_dashboard_no_data') + '</td></tr>'
+    ? '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:30px">' + t('admin_dashboard_no_data') + '</td></tr>'
     : vs.map(s => `<tr>
       <td><code>${s.version || '(空)'}</code></td>
-      <td>${s.platform || '-'}</td>
       <td>${s.request_count}</td>
       <td>${s.last_request || '-'}</td>
     </tr>`).join("");

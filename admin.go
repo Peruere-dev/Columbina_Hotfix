@@ -33,7 +33,6 @@ func buildAdminHTML() string {
 		"admin_dashboard_total_requests",
 		"admin_dashboard_version_title",
 		"admin_dashboard_version",
-		"admin_dashboard_platform",
 		"admin_dashboard_requests",
 		"admin_dashboard_last_request",
 		"admin_dashboard_no_data",
