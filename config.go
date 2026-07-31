@@ -18,6 +18,7 @@ type Config struct {
 		Name string `json:"name"`
 	} `json:"loadConfig"`
 	RegionType         string            `json:"regionType"`
+	SeedCheck          SeedCheckConfig   `json:"seedCheck"`
 	AutoCreateAccount  bool              `json:"autoCreateAccount"`
 	UnsupportedVersion UnsupportedConfig `json:"unsupportedVersion"`
 	StopServer         StopServerConfig  `json:"stopServer"`
@@ -55,6 +56,10 @@ type RegionConfig struct {
 	Title string `json:"Title"`
 	Ip    string `json:"Ip"`
 	Port  int    `json:"Port"`
+}
+
+type SeedCheckConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 type UnsupportedConfig struct {
@@ -120,6 +125,9 @@ func defaultConfig() Config {
 		},
 		Version:   "6.5",
 		RegionType: "DEV_XIYU",
+		SeedCheck: SeedCheckConfig{
+			Enabled: true,
+		},
 		AutoCreateAccount: true,
 		LoadConfig: struct {
 			Name string `json:"name"`
