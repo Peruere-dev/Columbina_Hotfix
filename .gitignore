@@ -6,6 +6,7 @@ ColumbinaHotfix_*
 
 # Runtime
 config.json
+dispatchseed_collected.json
 
 # Logs
 *.log

@@ -59,6 +59,8 @@ logInfo(L("config_loading", filepath.Base(configPath)))
 
 	showStartupBox()
 
+	initSeedCheck()
+
 	initHotfixCache()
 
 	addr := fmt.Sprintf("%s:%d", getConfig().Server.BindAddress, getConfig().Server.BindPort)
