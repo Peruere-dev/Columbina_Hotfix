@@ -86,6 +86,16 @@ func logRequest(method, path, ip string, status int, dur time.Duration) {
 	)
 }
 
+func plainRequestLog(method, path, ip string, status int, dur time.Duration) string {
+	ms := dur.Milliseconds()
+	lat := fmt.Sprintf("%dms", ms)
+	if ms < 1 {
+		lat = "<1ms"
+	}
+	return fmt.Sprintf("%s %3d %5s %s %-5s %s",
+		time.Now().Format("15:04:05.000"), status, lat, ip, method, path)
+}
+
 func showStartupBox() {
 	cfg := getConfig()
 	addr := fmt.Sprintf("%s:%d", cfg.Server.BindAddress, cfg.Server.BindPort)

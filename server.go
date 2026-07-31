@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -49,10 +50,35 @@ const maxLogSize = 10 << 20
 
 func rotateLog(path string) {
 	fi, err := os.Stat(path)
-	if err != nil || fi.Size() < maxLogSize {
+	if err != nil {
 		return
 	}
-	os.Rename(path, path+".old")
+	today := time.Now().Format("2006-01-02")
+	fileDay := fi.ModTime().Format("2006-01-02")
+	if fi.Size() < maxLogSize && fileDay == today {
+		return
+	}
+
+	date := today
+	if fileDay != today {
+		date = fileDay
+	}
+	base := strings.TrimSuffix(path, ".log")
+	target := fmt.Sprintf("%s%s.log", base, date)
+	for i := 2; ; i++ {
+		_, errLog := os.Stat(target)
+		_, errGz := os.Stat(target + ".gz")
+		if errLog != nil && errGz != nil {
+			break
+		}
+		target = fmt.Sprintf("%s%s-%d.log", base, date, i)
+	}
+
+	if err := os.Rename(path, target); err != nil {
+		return
+	}
+	gzipFile(target)
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return
@@ -66,10 +92,39 @@ func rotateLog(path string) {
 	}
 }
 
+func gzipFile(path string) {
+	src, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer src.Close()
+	dst, err := os.Create(path + ".gz")
+	if err != nil {
+		return
+	}
+	defer dst.Close()
+	gz := gzip.NewWriter(dst)
+	if _, err := io.Copy(gz, src); err != nil {
+		gz.Close()
+		return
+	}
+	if err := gz.Close(); err != nil {
+		return
+	}
+	os.Remove(path)
+}
+
 func writeLog(msg string) {
 	logMu.Lock()
 	rotateLog("server.log")
 	logger.Println(msg)
+	logMu.Unlock()
+}
+
+func writeLogRaw(msg string) {
+	logMu.Lock()
+	rotateLog("server.log")
+	logFile.WriteString(msg + "\n")
 	logMu.Unlock()
 }
 
@@ -108,6 +163,7 @@ func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]int{"code": 0})
 		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, time.Since(start))
+		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, time.Since(start)))
 		return
 	}
 
@@ -122,9 +178,11 @@ func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		elapsed := time.Since(start)
 		writeDataLog(fmt.Sprintf("%s [%dms]", logStr, elapsed.Milliseconds()))
 		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, elapsed)
+		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, elapsed))
 	} else {
 		writeDataLog(fmt.Sprintf("%s 404", logStr))
 		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 404, time.Since(start))
+		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 404, time.Since(start)))
 		http.NotFound(w, r)
 	}
 }
@@ -663,14 +721,6 @@ func buildRegionInfoFromHotfix(hotfix *HotfixData, ip string, port int, versionS
 	return BuildRegionInfo(params)
 }
 
-func buildDefaultRegionInfo(ip string, port int) []byte {
-	return BuildRegionInfo(RegionInfoParams{
-		GateserverIP:   ip,
-		GateserverPort: uint32(port),
-		AreaType:       "CN",
-	})
-}
-
 func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request, body []byte) {
 	incrementHotUpdateCount()
 
@@ -729,15 +779,12 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 	}
 
 	if version == "" || versionNum == "" {
-		riBytes := buildDefaultRegionInfo(ip, port)
-		rsp := QueryCurRegionRsp{
-			Retcode:                    0,
-			Msg:                        "OK",
-			RegionInfo:                 riBytes,
-			ClientSecretKey:            dispatchSeed,
-			RegionCustomConfigEncrypted: buildXORConfig("0"),
+		if regionName == "" {
+			rsp := BuildQueryCurRegionRsp(QueryCurRegionRsp{Retcode: 1, Msg: "Not Found version config"})
+			sendText(w, base64.StdEncoding.EncodeToString(rsp))
+		} else {
+			sendJSON(w, map[string]string{"retcode": "-1", "msg": "system error"})
 		}
-		sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID, dispatchSeedParam)
 		return
 	}
 
