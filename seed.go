@@ -38,12 +38,22 @@ func initSeedCheck() {
 		logError(fmt.Sprintf("seed check: verified file unusable (%v); falling back to no verification and no writes", err))
 	} else {
 		seedVerified = m
+		ensureSeedFile(filepath.Join(seedBaseDir, verifiedSeedFile), m)
 	}
 	if m, err := loadSeedMap(filepath.Join(seedBaseDir, collectedSeedFile)); err != nil {
 		seedDataValid = false
 		logError(fmt.Sprintf("seed check: collected file unusable (%v); falling back to no verification and no writes", err))
 	} else {
 		seedCollected = m
+		ensureSeedFile(filepath.Join(seedBaseDir, collectedSeedFile), m)
+	}
+}
+
+func ensureSeedFile(path string, m SeedMap) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := writeSeedMapAtomic(path, m); err != nil {
+			logError(fmt.Sprintf("seed check: failed to create %s: %v", filepath.Base(path), err))
+		}
 	}
 }
 
