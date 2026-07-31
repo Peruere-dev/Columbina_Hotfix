@@ -107,6 +107,10 @@ func showStartupBox() {
 	fmt.Printf("%s╭─ ColumbinaHotfix ─%s┐%s\n",
 		cDim, strings.Repeat("─", inner-19), cReset)
 
+	fmt.Printf("%s│%s  %sVersion  %s%s%*s%s│%s\n",
+		cDim, cReset, cBlue, cReset, "v"+buildVersion,
+		inner-2-10-len("v"+buildVersion), "", cDim, cReset)
+
 	fmt.Printf("%s│%s  %sListen   %s%s%*s%s│%s\n",
 		cDim, cReset, cBlue, cReset, addr,
 		inner-2-9-len(addr), "", cDim, cReset)
@@ -160,6 +164,7 @@ func printHelp() {
 func printStatus() {
 	uptime := time.Since(startTime)
 	dash := getDashboardStats()
+	fmt.Printf("  ColumbinaHotfix v%s (pid %d)\n", buildVersion, os.Getpid())
 	fmt.Printf("  "+L("repl_status")+"\n",
 		os.Getpid(), fmtDuration(uptime), reqCount.Load())
 	fmt.Printf("  "+L("repl_status_users")+"\n",

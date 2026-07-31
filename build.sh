@@ -1,5 +1,9 @@
 #!/bin/sh
 
+VERSION="${1:-1.0.0}"
+
+echo "Build version: $VERSION"
+echo ""
 echo "Select build target:"
 echo "  1) linux/amd64"
 echo "  2) linux/arm64"
@@ -44,5 +48,5 @@ else
   out="ColumbinaHotfix_${GOOS}_${GOARCH}_${MODE}${ext}"
 fi
 
-env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build $TRIM -ldflags="$LDFLAGS" -o "$out" .
-echo "Built: $out"
+env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build $TRIM -ldflags="$LDFLAGS -X main.buildVersion=$VERSION" -o "$out" .
+echo "Built: $out (v$VERSION)"

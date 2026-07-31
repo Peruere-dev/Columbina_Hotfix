@@ -10,6 +10,10 @@ import (
 
 var httpServer *http.Server
 
+// buildVersion is the release version, overridable at build time via
+// -ldflags "-X main.buildVersion=..."
+var buildVersion = "1.0.0"
+
 func main() {
 	startTime = time.Now()
 
