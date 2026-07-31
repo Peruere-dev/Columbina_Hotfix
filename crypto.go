@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 )
 
 //go:embed keys/dispatchKey.bin
@@ -115,16 +114,6 @@ func encryptAndSignRegionData(regionInfo []byte, keyID string) map[string]string
 	fmt.Sscanf(keyID, "%d", &kid)
 	pubKey, ok := encryptionKeys[kid]
 	if !ok {
-		ids := make([]int, 0, len(encryptionKeys))
-		for id := range encryptionKeys {
-			ids = append(ids, id)
-		}
-		sort.Ints(ids)
-		if len(ids) > 0 {
-			pubKey = encryptionKeys[ids[0]]
-		}
-	}
-	if pubKey == nil {
 		return map[string]string{"content": "", "sign": ""}
 	}
 
