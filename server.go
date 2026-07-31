@@ -180,10 +180,10 @@ func (s *DispatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, elapsed)
 		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, elapsed))
 	} else {
-		writeDataLog(fmt.Sprintf("%s 404", logStr))
-		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 404, time.Since(start))
-		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 404, time.Since(start)))
-		http.NotFound(w, r)
+		writeDataLog(fmt.Sprintf("%s 200 system error", logStr))
+		sendJSON(w, map[string]string{"retcode": "-1", "msg": "system error"})
+		logRequest(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, time.Since(start))
+		writeLogRaw(plainRequestLog(r.Method, r.URL.RequestURI(), r.RemoteAddr, 200, time.Since(start)))
 	}
 }
 
@@ -224,7 +224,8 @@ func (s *DispatchServer) route(method, urlPath string) func(http.ResponseWriter,
 
 	case method == "GET" && urlPath == "/query_region_list":
 		return s.handleRegionList
-	case urlPath == "/query_cur_region" || strings.HasPrefix(urlPath, "/query_cur_region/"):
+	case urlPath == "/query_cur_region" || strings.HasPrefix(urlPath, "/query_cur_region/") ||
+		urlPath == "/query_gateserver" || strings.HasPrefix(urlPath, "/query_gateserver/"):
 		return s.handleCurRegion
 	case method == "GET" && urlPath == "/query_server_address":
 		return s.handleQueryServerAddress
@@ -233,11 +234,11 @@ func (s *DispatchServer) route(method, urlPath string) func(http.ResponseWriter,
 
 	case method == "GET" && urlPath == "/combo/box/api/config/sdk/combo":
 		return s.handleComboConfig
-	case method == "GET" && urlPath == "/hk4e_global/combo/granter/api/getConfig":
+	case method == "GET" && (urlPath == "/hk4e_global/combo/granter/api/getConfig" || urlPath == "/hk4e_cn/combo/granter/api/getConfig"):
 		return s.handleGranterGetConfig
-	case method == "GET" && urlPath == "/hk4e_global/mdk/shield/api/loadConfig":
+	case method == "GET" && (urlPath == "/hk4e_global/mdk/shield/api/loadConfig" || urlPath == "/hk4e_cn/mdk/shield/api/loadConfig"):
 		return s.handleLoadConfig
-	case method == "GET" && urlPath == "/hk4e_global/mdk/agreement/api/getAgreementInfos":
+	case method == "GET" && (urlPath == "/hk4e_global/mdk/agreement/api/getAgreementInfos" || urlPath == "/hk4e_cn/mdk/agreement/api/getAgreementInfos"):
 		return s.handleAgreement
 	case method == "GET" && urlPath == "/authentication/type":
 		return s.handleAuthType
@@ -737,14 +738,12 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 
 	dispatchSeedParam := r.URL.Query().Get("dispatchSeed")
 	keyID := r.URL.Query().Get("key_id")
-	if keyID == "" {
-		keyID = "4"
-	}
 	version := r.URL.Query().Get("version")
+	platform := r.URL.Query().Get("platform")
 
-	platform := ""
-	if len(parts) > 1 {
-		platform = parts[1]
+	if seedReject(version, platform, dispatchSeedParam, regionName) {
+		sendCurRegionResponse(w, BuildQueryCurRegionRsp(QueryCurRegionRsp{Retcode: 1}), keyID)
+		return
 	}
 	recordVersionRequest(version, platform)
 
@@ -774,17 +773,12 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 			Msg:        stopCfg.Message,
 			StopServer: BuildStopServerInfo(now, now+86400, stopCfg.URL, stopCfg.Message),
 		}
-		sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID, dispatchSeedParam)
+		sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID)
 		return
 	}
 
 	if version == "" || versionNum == "" {
-		if regionName == "" {
-			rsp := BuildQueryCurRegionRsp(QueryCurRegionRsp{Retcode: 1, Msg: "Not Found version config"})
-			sendText(w, base64.StdEncoding.EncodeToString(rsp))
-		} else {
-			sendJSON(w, map[string]string{"retcode": "-1", "msg": "system error"})
-		}
+		sendCurRegionResponse(w, BuildQueryCurRegionRsp(QueryCurRegionRsp{Retcode: 1, Msg: "Not Found version config"}), keyID)
 		return
 	}
 
@@ -799,7 +793,7 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 			RegionCustomConfigEncrypted: buildXORConfig("0"),
 			ConnectGateTicket:          "hotfix",
 		}
-		sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID, dispatchSeedParam)
+		sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID)
 		return
 	}
 
@@ -809,16 +803,14 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 		Msg:         getConfig().UnsupportedVersion.Message,
 		ForceUpdate: BuildForceUpdateInfo(getConfig().UnsupportedVersion.URL),
 	}
-	sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID, dispatchSeedParam)
+	sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID)
 }
 
-func sendCurRegionResponse(w http.ResponseWriter, curRegion []byte, keyID string, dispatchSeed string) {
-	if dispatchSeed != "" {
-		result := encryptAndSignRegionData(curRegion, keyID)
-		if result["content"] != "" {
-			sendJSON(w, result)
-			return
-		}
+func sendCurRegionResponse(w http.ResponseWriter, curRegion []byte, keyID string) {
+	result := encryptAndSignRegionData(curRegion, keyID)
+	if result["content"] != "" {
+		sendJSON(w, result)
+		return
 	}
 	// Return raw base64 (like hotfix.nyakya.com)
 	sendText(w, base64.StdEncoding.EncodeToString(curRegion))
