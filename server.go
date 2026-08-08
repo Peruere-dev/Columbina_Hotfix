@@ -875,48 +875,103 @@ func (s *DispatchServer) handleComboConfig(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// sdkRegion 根据请求路径前缀判断国服(CN)/海外(OS)
+func sdkRegion(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, "/hk4e_cn/") {
+		return "cn"
+	}
+	return "os"
+}
+
 func (s *DispatchServer) handleGranterGetConfig(w http.ResponseWriter, r *http.Request, body []byte) {
-	sendJSON(w, map[string]interface{}{
-		"retcode": 0,
-		"message": "OK",
-		"data": map[string]interface{}{
-			"protocol":                  true,
-			"qr_enabled":                false,
-			"log_level":                 "INFO",
-			"announce_url":              "https://webstatic-sea.hoyoverse.com/hk4e/announcement/index.html?sdk_presentation_style=fullscreen&sdk_screen_transparent=true&game_biz=hk4e_global&auth_appid=announcement&game=hk4e#/",
-			"push_alias_type":           2,
-			"disable_ysdk_guard":        false,
-			"enable_announce_pic_popup": true,
-		},
-	})
+	cn := sdkRegion(r) == "cn"
+	announceURL := "https://sdk.hoyoverse.com/hk4e/announcement/index.html?sdk_presentation_style=fullscreen&announcement_version=2.49&sdk_screen_transparent=true&game_biz=hk4e_global&auth_appid=announcement&game=hk4e#/"
+	appName := "原神海外"
+	protocol := true
+	pushAlias := 2
+	qrEnabled := false
+	fwSwitch := map[string]interface{}{"allow_notification": false, "initialize_appsflyer": false}
+	if cn {
+		announceURL = "https://sdk.mihoyo.com/hk4e/announcement/index.html?sdk_presentation_style=fullscreen&sdk_screen_transparent=true&auth_appid=announcement&authkey_ver=1&game_biz=hk4e_cn&sign_type=2&version=2.49&game=hk4e#/"
+		appName = "原神"
+		protocol = false
+		pushAlias = 1
+		qrEnabled = true
+		fwSwitch = map[string]interface{}{"jpush": true, "allow_notification": false}
+	}
+	data := map[string]interface{}{
+		"protocol":                  protocol,
+		"qr_enabled":                qrEnabled,
+		"log_level":                 "INFO",
+		"announce_url":              announceURL,
+		"push_alias_type":           pushAlias,
+		"disable_ysdk_guard":        false,
+		"enable_announce_pic_popup": true,
+		"app_name":                  appName,
+		"enable_user_center":        true,
+		"ugc_protocol":              true,
+		"functional_switch_configs": fwSwitch,
+	}
+	sendJSON(w, map[string]interface{}{"retcode": 0, "message": "OK", "data": data})
 }
 
 func (s *DispatchServer) handleLoadConfig(w http.ResponseWriter, r *http.Request, body []byte) {
-	sendJSON(w, map[string]interface{}{
-		"retcode": 0,
-		"message": "OK",
-		"data": map[string]interface{}{
-			"id":                     6,
-			"game_key":               "hk4e_global",
-			"client":                 "PC",
-			"identity":               "I_IDENTITY",
-			"guest":                  false,
-			"ignore_versions":        "",
-			"scene":                  "S_NORMAL",
-			"name":                   getConfig().LoadConfig.Name,
-			"disable_regist":         false,
-			"enable_email_captcha":   false,
-			"thirdparty":             []string{"fb", "tw"},
-			"disable_mmt":            false,
-			"server_guest":           false,
-			"thirdparty_ignore":      map[string]string{"tw": "", "fb": ""},
-			"enable_ps_bind_account": false,
-			"thirdparty_login_configs": map[string]interface{}{
-				"tw": map[string]interface{}{"token_type": "TK_GAME_TOKEN", "game_token_expires_in": 604800},
-				"fb": map[string]interface{}{"token_type": "TK_GAME_TOKEN", "game_token_expires_in": 604800},
-			},
-		},
-	})
+	cn := sdkRegion(r) == "cn"
+	gameKey := "hk4e_global"
+	name := "原神海外"
+	if cn {
+		gameKey = "hk4e_cn"
+		name = "原神"
+	}
+	data := map[string]interface{}{
+		"id":                                 5,
+		"game_key":                           gameKey,
+		"client":                             "Android",
+		"identity":                           "I_IDENTITY",
+		"guest":                              false,
+		"ignore_versions":                    "",
+		"scene":                              "S_NORMAL",
+		"name":                               name,
+		"disable_regist":                     false,
+		"enable_email_captcha":               cn,
+		"thirdparty":                         []string{"fb", "tw"},
+		"disable_mmt":                        cn,
+		"server_guest":                       false,
+		"thirdparty_ignore":                  map[string]string{},
+		"enable_ps_bind_account":             false,
+		"thirdparty_login_configs":           map[string]string{},
+		"initialize_firebase":                false,
+		"bbs_auth_login":                     false,
+		"bbs_auth_login_ignore":              []string{},
+		"fetch_instance_id":                  !cn,
+		"enable_flash_login":                 cn,
+		"enable_logo_18":                     false,
+		"logo_height":                        "0",
+		"logo_width":                         "0",
+		"enable_cx_bind_account":             false,
+		"firebase_blacklist_devices_switch":  !cn,
+		"firebase_blacklist_devices_version": 1,
+		"hoyolab_auth_login":                 false,
+		"hoyolab_auth_login_ignore":          []string{},
+		"hoyoplay_auth_login":                false,
+		"enable_douyin_flash_login":          false,
+		"enable_age_gate":                    !cn,
+		"enable_age_gate_ignore":             []string{},
+		"enable_br_age_gate":                 false,
+		"enable_br_age_gate_ignore":          []string{},
+	}
+	if cn {
+		data["thirdparty"] = []string{"tp"}
+		data["thirdparty_login_configs"] = map[string]interface{}{}
+	} else {
+		data["thirdparty"] = []string{"gl", "fb", "tw"}
+		data["thirdparty_login_configs"] = map[string]interface{}{
+			"fb": map[string]interface{}{"token_type": "TK_GAME_TOKEN", "game_token_expires_in": 2592000},
+			"gl": map[string]interface{}{"token_type": "TK_GAME_TOKEN", "game_token_expires_in": 604800},
+			"tw": map[string]interface{}{"token_type": "TK_GAME_TOKEN", "game_token_expires_in": 2592000},
+		}
+	}
+	sendJSON(w, map[string]interface{}{"retcode": 0, "message": "OK", "data": data})
 }
 
 func (s *DispatchServer) handleAgreement(w http.ResponseWriter, r *http.Request, body []byte) {
