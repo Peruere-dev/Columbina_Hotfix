@@ -49,7 +49,22 @@ func initDataLogging() {
 
 const maxLogSize = 10 << 20
 
+var (
+	logCheckMu    sync.Mutex
+	logLastChecks = map[string]time.Time{}
+)
+
+// rotateLog checks file size/date at most once per 30s per path to avoid a
+// stat syscall on every log line.
 func rotateLog(path string) {
+	logCheckMu.Lock()
+	if time.Since(logLastChecks[path]) < 30*time.Second {
+		logCheckMu.Unlock()
+		return
+	}
+	logLastChecks[path] = time.Now()
+	logCheckMu.Unlock()
+
 	fi, err := os.Stat(path)
 	if err != nil {
 		return
@@ -355,10 +370,18 @@ func (s *DispatchServer) handleAdminUsers(w http.ResponseWriter, r *http.Request
 	}
 	var users []userJSON
 	for _, a := range accounts {
+		banned, reason, permanent, expiresAt := effectiveBan(a)
+		b, p := 0, 0
+		if banned {
+			b = 1
+		}
+		if permanent {
+			p = 1
+		}
 		users = append(users, userJSON{
 			UID: a.UID, Username: a.Username, CreatedAt: a.CreatedAt,
-			LastLogin: a.LastLogin, Banned: a.Banned, BanReason: a.BanReason,
-			BanExpiresAt: a.BanExpiresAt, BanPermanent: a.BanPermanent,
+			LastLogin: a.LastLogin, Banned: b, BanReason: reason,
+			BanExpiresAt: expiresAt, BanPermanent: p,
 		})
 	}
 	sendJSON(w, map[string]interface{}{"ok": true, "data": users})
@@ -690,18 +713,36 @@ func (s *DispatchServer) handleAdminResetToken(w http.ResponseWriter, r *http.Re
 	sendJSON(w, map[string]interface{}{"ok": true})
 }
 
+// sdkEnv returns the SDK environment id for a dispatch client version.
+// env depends only on the leading two-character business code (CN -> 0, else -> 2).
+func sdkEnv(versionCode string) string {
+	if len(versionCode) >= 2 && versionCode[0:2] == "CN" {
+		return "0"
+	}
+	return "2"
+}
+
 func (s *DispatchServer) handleRegionList(w http.ResponseWriter, r *http.Request, body []byte) {
 	versionCode := r.URL.Query().Get("version")
-	sdkenv := "2"
-	if strings.HasPrefix(versionCode, "CNRELiOS") || strings.HasPrefix(versionCode, "CNRELWin") || strings.HasPrefix(versionCode, "CNRELAnd") {
-		sdkenv = "0"
-	}
-	rsp := buildRegionList(sdkenv)
+	rsp := buildRegionList(sdkEnv(versionCode))
 	sendText(w, rsp)
 }
 
-func getRegionConfig(regionName string) *RegionConfig {
-	for _, r := range getConfig().Regions {
+// regionFromPath extracts the region suffix from a query_cur_region or
+// query_gateserver path, e.g. "/query_gateserver/hotfix" -> "hotfix".
+// A bare path with no suffix returns "" (region resolved from defaults).
+func regionFromPath(p string) string {
+	base := strings.TrimPrefix(p, "/query_gateserver")
+	base = strings.TrimPrefix(base, "/query_cur_region")
+	base = strings.TrimPrefix(base, "/")
+	if base == "" {
+		return ""
+	}
+	return strings.SplitN(base, "/", 2)[0]
+}
+
+func findRegion(cfg Config, regionName string) *RegionConfig {
+	for _, r := range cfg.Regions {
 		if r.Name == regionName {
 			return &r
 		}
@@ -710,23 +751,24 @@ func getRegionConfig(regionName string) *RegionConfig {
 }
 
 func buildRegionList(sdkenv string) string {
-	addr := getConfig().Server.AccessAddress
-	port := getConfig().Server.AccessPort
+	cfg := getConfig()
+	addr := cfg.Server.AccessAddress
+	port := cfg.Server.AccessPort
 	schema := "http"
-	if getConfig().Server.TLS.Enable || getConfig().Server.ForcePublicHTTPS {
+	if cfg.Server.TLS.Enable || cfg.Server.ForcePublicHTTPS {
 		schema = "https"
 	}
 	dispatchDomain := fmt.Sprintf("%s://%s:%d", schema, addr, port)
 
 	var regions [][]byte
-	for _, r := range getConfig().Regions {
+	for _, r := range cfg.Regions {
 		rname := r.Name
 		rtitle := r.Title
 		if rname == "" {
 			continue
 		}
 		dispatchURL := fmt.Sprintf("%s/query_cur_region/%s", dispatchDomain, rname)
-		regions = append(regions, BuildRegionSimpleInfo(rname, rtitle, getConfig().RegionType, dispatchURL))
+		regions = append(regions, BuildRegionSimpleInfo(rname, rtitle, cfg.RegionType, dispatchURL))
 	}
 
 	xorConfig := buildXORConfig(sdkenv)
@@ -752,17 +794,11 @@ func buildRegionInfoFromHotfix(hotfix *HotfixData, ip string, port int, versionS
 
 func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request, body []byte) {
 	incrementHotUpdateCount()
+	cfg := getConfig()
 
 	writeDataLog(fmt.Sprintf("[DISPATCH] %s %s", r.RemoteAddr, r.URL.RequestURI()))
 
-	basePath := strings.TrimPrefix(r.URL.Path, "/query_cur_region")
-	basePath = strings.TrimPrefix(basePath, "/")
-	parts := strings.Split(basePath, "/")
-	regionName := parts[0]
-	if len(parts) == 1 && parts[0] == "" {
-		parts = parts[:0]
-		regionName = ""
-	}
+	regionName := regionFromPath(r.URL.Path)
 
 	dispatchSeedParam := r.URL.Query().Get("dispatchSeed")
 	keyID := r.URL.Query().Get("key_id")
@@ -775,24 +811,24 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 	}
 	recordVersionRequest(version, platform)
 
-	stopCfg := getConfig().StopServer
+	stopCfg := cfg.StopServer
 	now := uint32(time.Now().Unix())
 	inMaintenance := now >= stopCfg.BeginTime && now < stopCfg.EndTime
 
 	versionNum := extractVersionNum(version)
 
-	regionCfg := getRegionConfig(regionName)
+	regionCfg := findRegion(cfg, regionName)
 	if regionCfg == nil {
-		regionCfg = &RegionConfig{Name: regionName, Title: regionName, Ip: getConfig().GameServer.AccessAddress, Port: getConfig().GameServer.AccessPort}
+		regionCfg = &RegionConfig{Name: regionName, Title: regionName, Ip: cfg.GameServer.AccessAddress, Port: cfg.GameServer.AccessPort}
 	}
 
 	ip := regionCfg.Ip
 	port := regionCfg.Port
 	if ip == "" {
-		ip = getConfig().GameServer.AccessAddress
+		ip = cfg.GameServer.AccessAddress
 	}
 	if port == 0 {
-		port = getConfig().GameServer.AccessPort
+		port = cfg.GameServer.AccessPort
 	}
 
 	if inMaintenance {
@@ -828,8 +864,8 @@ func (s *DispatchServer) handleCurRegion(w http.ResponseWriter, r *http.Request,
 	// No hotfix config: unsupported version
 	rsp := QueryCurRegionRsp{
 		Retcode:     20,
-		Msg:         getConfig().UnsupportedVersion.Message,
-		ForceUpdate: BuildForceUpdateInfo(getConfig().UnsupportedVersion.URL),
+		Msg:         cfg.UnsupportedVersion.Message,
+		ForceUpdate: BuildForceUpdateInfo(cfg.UnsupportedVersion.URL),
 	}
 	sendCurRegionResponse(w, BuildQueryCurRegionRsp(rsp), keyID)
 }
@@ -1074,12 +1110,17 @@ func (s *DispatchServer) handleLogin(w http.ResponseWriter, r *http.Request, bod
 	if banned {
 		var msg string
 		if permanent {
-			msg = L("msg_account_banned_perm")
+			if reason == "" {
+				msg = L("msg_account_banned_perm")
+			} else {
+				msg = L("msg_account_banned_perm") + "\n" + reason
+			}
 		} else {
 			if reason == "" {
-				reason = L("msg_account_banned")
+				msg = L("msg_account_banned") + "\n" + L("msg_ban_unban_at") + banExpiresAt
+			} else {
+				msg = L("msg_account_banned") + "\n" + reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 			}
-			msg = reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 		}
 		sendJSON(w, map[string]interface{}{
 			"message": msg,
@@ -1166,12 +1207,17 @@ func (s *DispatchServer) handleVerify(w http.ResponseWriter, r *http.Request, bo
 	if banned {
 		var msg string
 		if permanent {
-			msg = L("msg_account_banned_perm")
+			if reason == "" {
+				msg = L("msg_account_banned_perm")
+			} else {
+				msg = L("msg_account_banned_perm") + "\n" + reason
+			}
 		} else {
 			if reason == "" {
-				reason = L("msg_account_banned")
+				msg = L("msg_account_banned") + "\n" + L("msg_ban_unban_at") + banExpiresAt
+			} else {
+				msg = L("msg_account_banned") + "\n" + reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 			}
-			msg = reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 		}
 		sendJSON(w, map[string]interface{}{
 			"message": msg,
@@ -1265,12 +1311,17 @@ func (s *DispatchServer) handleGranterLogin(w http.ResponseWriter, r *http.Reque
 	if banned {
 		var msg string
 		if permanent {
-			msg = L("msg_account_banned_perm")
+			if reason == "" {
+				msg = L("msg_account_banned_perm")
+			} else {
+				msg = L("msg_account_banned_perm") + "\n" + reason
+			}
 		} else {
 			if reason == "" {
-				reason = L("msg_account_banned")
+				msg = L("msg_account_banned") + "\n" + L("msg_ban_unban_at") + banExpiresAt
+			} else {
+				msg = L("msg_account_banned") + "\n" + reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 			}
-			msg = reason + "\n" + L("msg_ban_unban_at") + banExpiresAt
 		}
 		sendJSON(w, map[string]interface{}{
 			"message": msg,

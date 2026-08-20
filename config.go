@@ -185,5 +185,9 @@ func reloadConfig() error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &cfg)
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	clearRegionRespCache()
+	return nil
 }

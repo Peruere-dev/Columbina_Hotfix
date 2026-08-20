@@ -55,7 +55,7 @@ Per-version+platform verification of the `dispatchSeed` query param on `query_cu
 go test -run 'TestIsValidHex16|TestCanonicalKeys|TestSeedReject|TestEncryptAndSignKeyID' ./...
 ```
 
-Single-package Go tests in `seed_test.go` (hex-format, canonical key normalization, verified strict, whitelist, corrupt-file fallback, key_id encryption). `TestSeedReject` writes collected file to `t.TempDir()`.
+Single-package Go tests in `seed_test.go` (hex-format, canonical key normalization, verified strict, whitelist, corrupt-file fallback, key_id encryption) and `dispatch_test.go` (`regionFromPath`, RSA response cache). `TestSeedReject` writes collected file to `t.TempDir()`. `TestEncryptAndSignKeyID` in `seed_test.go` shares `encryptionKeys`/`signingKey` with `dispatch_test.go`'s `TestRegionRespCache`.
 
 ## Key files
 
@@ -66,6 +66,7 @@ Single-package Go tests in `seed_test.go` (hex-format, canonical key normalizati
 | `config.go` | Config struct (incl. `seedCheck`), load/save, auto-gen if missing |
 | `seed.go` | dispatchSeed verify/collect, probe-path whitelist, atomic writes |
 | `seed_test.go` | unit tests for seed check + key_id encryption |
+| `dispatch_test.go` | unit tests for region path parsing + RSA response cache |
 | `crypto.go` | RSA keys, dispatch encryption/signing. Embedded keys with disk override |
 | `database.go` | SQLite, session expiry (24h TTL), user CRUD |
 | `hotfix.go` | hotfix JSON cache (`sync.RWMutex` map, all `hotfix/{region}/{plat}/{ver}.json` loaded at startup, no cap) |
@@ -79,6 +80,14 @@ Single-package Go tests in `seed_test.go` (hex-format, canonical key normalizati
 ## Admin panel
 
 Route configurable via `admin.route` in config.json (default `/admin`). Default creds `admin`/`123456` seeded once and printed to console at first startup only; default creds trigger `must_change_password` on login. Login via POST `/api/login` with `{username, password}`, token stored in localStorage.
+
+## Game login: no password verification (intentional)
+
+Official architecture — username/password auth lives in the **hk4e SDK account service**, not in the dispatch/dbgate/gateserver layers this repo replicates (`account_sdk_mgr.cpp` only forwards `account_token`/`combo_token` to the SDK). Because per client version the SDK keys differ, faithfully replicating official password auth is high-effort/low-value for a LAN server.
+
+So `handleLogin`/`handleVerify` do **no password check for existing accounts** (account exists → auto-create if missing → token issued; only ban state is enforced). Admin panel login keeps full password verification. Do not "fix" this without an explicit user request.
+
+Dispatch response caching: `query_cur_region` RSA `{content,sign}` is cached per `key_id`+sha256 (regionRespCache, `crypto.go`); `reloadConfig()` clears it (REPL `reload` / SIGHUP). Stats counters (`hot_update_count`, `version_stats`) are batched in memory and flushed to SQLite every 30s (`flushStats`, DB writes off the hot path).
 
 ## REPL commands
 

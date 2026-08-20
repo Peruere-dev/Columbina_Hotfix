@@ -8,10 +8,12 @@ import (
 	"crypto/x509"
 	"embed"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 )
 
 //go:embed keys/dispatchKey.bin
@@ -32,6 +34,21 @@ var (
 	signingKey     *rsa.PrivateKey
 	encryptionKeys map[int]*rsa.PublicKey
 )
+
+// regionRespCache caches the RSA-encrypted {content,sign} result keyed by
+// key_id + sha256(regionInfo). The plaintext is deterministic per
+// version/region/key_id (hotfix data + static config), so the encrypted
+// response never changes; reusing it avoids per-request RSA cost.
+var regionRespCache sync.Map // key "key_id/sha256[:8]" -> map[string]string
+
+// clearRegionRespCache drops all cached encrypted dispatch responses.
+// Called after config reload so changed hotfix/region configs take effect.
+func clearRegionRespCache() {
+	regionRespCache.Range(func(k, _ interface{}) bool {
+		regionRespCache.Delete(k)
+		return true
+	})
+}
 
 func loadKeys() error {
 	dispatchKey = readKey("dispatchKey.bin", embedDispatchKey)
@@ -117,6 +134,12 @@ func encryptAndSignRegionData(regionInfo []byte, keyID string) map[string]string
 		return map[string]string{"content": "", "sign": ""}
 	}
 
+	sum := sha256.Sum256(regionInfo)
+	cacheKey := fmt.Sprintf("%d/%s", kid, hex.EncodeToString(sum[:8]))
+	if v, ok := regionRespCache.Load(cacheKey); ok {
+		return v.(map[string]string)
+	}
+
 	chunkSize := 256 - 11
 	var encrypted []byte
 	for i := 0; i < len(regionInfo); i += chunkSize {
@@ -137,8 +160,10 @@ func encryptAndSignRegionData(regionInfo []byte, keyID string) map[string]string
 		return map[string]string{"content": base64.StdEncoding.EncodeToString(encrypted), "sign": ""}
 	}
 
-	return map[string]string{
+	result := map[string]string{
 		"content": base64.StdEncoding.EncodeToString(encrypted),
 		"sign":    base64.StdEncoding.EncodeToString(sig),
 	}
+	regionRespCache.Store(cacheKey, result)
+	return result
 }

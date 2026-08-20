@@ -4,12 +4,26 @@ import (
 	_ "embed"
 	"encoding/json"
 	"strings"
+	"sync"
 )
 
 //go:embed static/admin.html
 var adminHTML string
 
+var (
+	adminHTMLCacheMu   sync.Mutex
+	adminHTMLCacheLang int
+	adminHTMLCacheHTML string
+)
+
 func buildAdminHTML() string {
+	lang := getConfig().Language
+	adminHTMLCacheMu.Lock()
+	defer adminHTMLCacheMu.Unlock()
+	if adminHTMLCacheHTML != "" && adminHTMLCacheLang == lang {
+		return adminHTMLCacheHTML
+	}
+
 	adminKeys := []string{
 		"admin_page_title",
 		"admin_login_title",
@@ -117,9 +131,14 @@ func buildAdminHTML() string {
 	for _, k := range adminKeys {
 		m[k] = L(k)
 	}
+	var html string
 	langJSON, err := json.Marshal(m)
 	if err != nil {
-		return strings.Replace(adminHTML, "/*LANG_DATA*/", "{}", 1)
+		html = strings.Replace(adminHTML, "/*LANG_DATA*/", "{}", 1)
+	} else {
+		html = strings.Replace(adminHTML, "/*LANG_DATA*/", string(langJSON), 1)
 	}
-	return strings.Replace(adminHTML, "/*LANG_DATA*/", string(langJSON), 1)
+	adminHTMLCacheLang = lang
+	adminHTMLCacheHTML = html
+	return html
 }

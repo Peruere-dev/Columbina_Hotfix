@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -245,39 +246,48 @@ func updateUserPassword(username, newPassword string) error {
 	return err
 }
 
-func isUserBannedInfo(username string) (banned bool, reason string, permanent bool, expiresAt string) {
-	row := db.QueryRow("SELECT banned, ban_reason, ban_expires_at, ban_permanent FROM accounts WHERE username = ?", username)
-	var b, bp int
-	var br, bea sql.NullString
-	if err := row.Scan(&b, &br, &bea, &bp); err != nil {
-		return false, "", false, ""
+// effectiveBan reports the ban state of an account at the current time,
+// treating expired timed bans as not banned. Login checks and the admin UI
+// share this so both agree on whether a ban is still active.
+func effectiveBan(a *Account) (banned bool, reason string, permanent bool, expiresAt string) {
+	if a.BanPermanent == 1 {
+		return true, a.BanReason, true, ""
 	}
-	if bp == 1 {
-		return true, br.String, true, ""
-	}
-	if bea.Valid && bea.String != "" {
-		t, err := time.Parse("2006-01-02 15:04:05", bea.String)
+	if a.BanExpiresAt != "" {
+		t, err := time.Parse("2006-01-02 15:04:05", a.BanExpiresAt)
 		if err != nil {
-			t, err = time.Parse(time.RFC3339, bea.String)
+			t, err = time.Parse(time.RFC3339, a.BanExpiresAt)
 		}
 		if err == nil && time.Now().Before(t) {
-			return true, br.String, false, t.Format("2006-01-02 15:04:05")
+			return true, a.BanReason, false, t.Format("2006/01/02 15:04:05")
 		}
 	}
 	return false, "", false, ""
 }
 
-func getDashboardStats() map[string]int {
-	var total, banned int
-	if err := db.QueryRow("SELECT COUNT(*) FROM accounts").Scan(&total); err != nil {
-		dbLog.Printf("getDashboardStats total: %v", err)
+func isUserBannedInfo(username string) (banned bool, reason string, permanent bool, expiresAt string) {
+	a, err := getAccountByUsername(username)
+	if err != nil {
+		return false, "", false, ""
 	}
-	if err := db.QueryRow("SELECT COUNT(*) FROM accounts WHERE banned = 1 OR ban_permanent = 1").Scan(&banned); err != nil {
-		dbLog.Printf("getDashboardStats banned: %v", err)
+	return effectiveBan(a)
+}
+
+func getDashboardStats() map[string]int {
+	accounts, err := getAllAccounts()
+	if err != nil {
+		dbLog.Printf("getDashboardStats: %v", err)
+		return map[string]int{"total_users": 0, "active_users": 0, "banned_users": 0}
+	}
+	banned := 0
+	for _, a := range accounts {
+		if b, _, _, _ := effectiveBan(a); b {
+			banned++
+		}
 	}
 	return map[string]int{
-		"total_users":  total,
-		"active_users": total - banned,
+		"total_users":  len(accounts),
+		"active_users": len(accounts) - banned,
 		"banned_users": banned,
 	}
 }
@@ -343,25 +353,74 @@ func getHotUpdateCount() int {
 	if err := db.QueryRow("SELECT hot_update_count FROM stats WHERE id = 1").Scan(&count); err != nil {
 		dbLog.Printf("getHotUpdateCount: %v", err)
 	}
-	return count
+	return count + int(atomic.LoadInt64(&hotUpdatePending))
 }
 
 func incrementHotUpdateCount() {
-	if _, err := db.Exec("UPDATE stats SET hot_update_count = hot_update_count + 1 WHERE id = 1"); err != nil {
-		dbLog.Printf("incrementHotUpdateCount: %v", err)
-	}
+	atomic.AddInt64(&hotUpdatePending, 1)
 }
+
+// Pending stats, flushed to SQLite periodically by startStatsFlusher to keep
+// the hot dispatch path free of synchronous DB writes.
+var (
+	hotUpdatePending      int64
+	versionStatsPendingMu sync.Mutex
+	versionStatsPending   = map[string]int{}
+)
 
 func recordVersionRequest(version, platform string) {
 	if version == "" {
 		return
 	}
+	key := version + "\x00" + platform
+	versionStatsPendingMu.Lock()
+	versionStatsPending[key]++
+	versionStatsPendingMu.Unlock()
+}
+
+func flushStats() {
+	if n := atomic.SwapInt64(&hotUpdatePending, 0); n > 0 {
+		if _, err := db.Exec("UPDATE stats SET hot_update_count = hot_update_count + ? WHERE id = 1", n); err != nil {
+			dbLog.Printf("flushStats hot_update_count: %v", err)
+			atomic.AddInt64(&hotUpdatePending, n)
+		}
+	}
+
+	versionStatsPendingMu.Lock()
+	pending := versionStatsPending
+	versionStatsPending = map[string]int{}
+	versionStatsPendingMu.Unlock()
+
 	insertMu.Lock()
 	defer insertMu.Unlock()
-	if _, err := db.Exec(`INSERT INTO version_stats (version, platform, request_count, last_request) VALUES (?, ?, 1, CURRENT_TIMESTAMP)
-		ON CONFLICT(version, platform) DO UPDATE SET request_count = request_count + 1, last_request = CURRENT_TIMESTAMP`, version, platform); err != nil {
-		dbLog.Printf("recordVersionRequest(%s, %s): %v", version, platform, err)
+	for key, n := range pending {
+		parts := strings.SplitN(key, "\x00", 2)
+		version, platform := parts[0], parts[1]
+		if _, err := db.Exec(`INSERT INTO version_stats (version, platform, request_count, last_request) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(version, platform) DO UPDATE SET request_count = request_count + ?, last_request = CURRENT_TIMESTAMP`,
+			version, platform, n, n); err != nil {
+			dbLog.Printf("flushStats version_stats(%s, %s): %v", version, platform, err)
+			versionStatsPendingMu.Lock()
+			versionStatsPending[key] += n
+			versionStatsPendingMu.Unlock()
+		}
 	}
+}
+
+func startStatsFlusher() {
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				flushStats()
+			case <-shutdownCh:
+				flushStats()
+				return
+			}
+		}
+	}()
 }
 
 type VersionStat struct {

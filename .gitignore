@@ -6,6 +6,7 @@ ColumbinaHotfix_*
 
 # Runtime
 config.json
+config.json.bak
 dispatchseed_collected.json
 dispatchseed_verified.json
 

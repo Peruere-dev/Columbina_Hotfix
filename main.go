@@ -44,6 +44,7 @@ func main() {
 		logError("Failed to init database: " + err.Error())
 		os.Exit(1)
 	}
+	startStatsFlusher()
 
 	newUser, newPass, err := seedAdminConfig()
 	if err != nil {
@@ -72,11 +73,13 @@ func main() {
 
 	handler := NewDispatchServer()
 	httpServer = &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              addr,
+		Handler:           handler,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {

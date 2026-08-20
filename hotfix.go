@@ -98,6 +98,9 @@ func LoadHotfixConfig(versionStr string) *HotfixData {
 	if err := json.Unmarshal(data, &hd); err != nil {
 		return nil
 	}
+	hotfixCacheMu.Lock()
+	hotfixCache[key] = &hd
+	hotfixCacheMu.Unlock()
 	return &hd
 }
 
