@@ -146,4 +146,3 @@ ColumbinaHotfix/
 
 - [nod-krai-gi](https://github.com/renyi89/nod-krai-gi) — Rust 实现的原神 Dispatch / Game Server
 - [Grasscutter](https://github.com/Grasscutters/Grasscutter) — Java 原神服务端，本项目 dispatch 协议参考了其实现
-- [LunaGC](https://github.com/LunaGC/LunaGC-6.5.0) — 基于 Grasscutter 的原神服务端
